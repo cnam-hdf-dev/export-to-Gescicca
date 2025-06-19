@@ -1,0 +1,25 @@
+.export-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.export-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.export-select {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+
+.export-button {
+  padding: 10px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
