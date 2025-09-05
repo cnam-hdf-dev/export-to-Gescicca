@@ -28,6 +28,11 @@ const loadReferenceCsv = async (filePath, keyField, valueField) => {
   });
 };
 
+const formatCodePostal = (val) => {
+  if (val === undefined || val === null || val === "") return "";
+  return String(val).padStart(5, "0");
+};
+
 export default function ExportApprenants() {
   const [groupes, setGroupes] = useState([]);
   const [selectedGroupe, setSelectedGroupe] = useState("");
@@ -35,6 +40,7 @@ export default function ExportApprenants() {
   const [nomCentreEnseignement, setNomCentreEnseignement] = useState("");
   const [nomCentreAttachement, setNomCentreAttachement] = useState("");
   const [loading, setLoading] = useState(false);
+  const [csvPreview, setCsvPreview] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,7 +62,7 @@ export default function ExportApprenants() {
     fetchData();
   }, []);
 
-  const handleExport = async () => {
+  const handleExtract = async () => {
     const groupeInfo = groupes.find(g => g.codeGroupe.toString() === selectedGroupe);
     const nomGroupe = groupeInfo?.nomGroupe || '';
 
@@ -141,7 +147,7 @@ export default function ExportApprenants() {
           // "NOTE_SESSION_1",
           // "NOTE_SESSION_2",
           // "DATE_INSCRIPTION"
-        ].join(";")
+        ]
       ];
 
       const apprenantDetails = await Promise.all(
@@ -155,6 +161,9 @@ export default function ExportApprenants() {
       );
 
       apprenantDetails.forEach((d) => {
+        const codeInseeNaissance = formatCodePostal(communesMap[d.codeCommuneNaissance]);
+        const codePostal = formatCodePostal(d.adresse?.cp);
+
         csvRows.push([
           d.codeCivilite, // TITRE
           // '',// INDEMNISATION
@@ -171,10 +180,10 @@ export default function ExportApprenants() {
           d.nomJeuneFille || '',// NOM_USAGE
           d.dateNaissance, // DATE_NAISSANCE
           paysMap[d.codePaysNaissance] || "", // PAYS_NAISSANCE
-          communesMap[d.codeCommuneNaissance] || "", // LIEU_NAISSANCE
+          codeInseeNaissance, // LIEU_NAISSANCE
           d.adresse?.adr1, // ADRESSE_1
           d.adresse?.adr2 || '', // ADRESSE_2
-          d.adresse?.cp, // CODE_POSTAL
+          codePostal, // CODE_POSTAL
           d.adresse?.ville, // VILLE
           d.adresse?.pays?.nomPays, // PAYS
           d.adresse?.tel1, // TELEPHONE_PERSONNEL
@@ -214,7 +223,7 @@ export default function ExportApprenants() {
           // '',// ANNEE_FORMATION
           // '',// OPTION_FORMATION
           nomGroupe, // GROUPE_FORMATION
-          '',// STATUT_INSCRIPTION
+          d.inscriptions[0].codeStatut,// STATUT_INSCRIPTION
           '',// TYPE_INSCRIPTION
           // '',// CODE_UNITE
           // '',// GROUPE_UNITE
@@ -225,22 +234,25 @@ export default function ExportApprenants() {
           // '',// NOTE_SESSION_1
           // '',// NOTE_SESSION_2
           // '',// DATE_INSCRIPTION
-        ].map(v => `"${v !== undefined && v !== null ? v : ""}"`).join(";"));
+        ]);
       });
-
-      const blob = new Blob(["\ufeff" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `import_Gescicca_groupe_${nomGroupe}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      setCsvPreview(csvRows);
     } catch (err) {
       console.error("Erreur export:", err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExport = () => {
+    const blob = new Blob(["\ufeff" + csvPreview.map(r => r.map(v => `"${v !== undefined && v !== null ? v : ""}"`).join(";")).join("\n")], { type: "text/csv;charset=cp1252;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `import_Gescicca_groupe_${csvPreview[1][21]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -311,8 +323,39 @@ export default function ExportApprenants() {
       </div>      
       
       <button
-        onClick={handleExport}
+        onClick={handleExtract}
         disabled={loading || !selectedGroupe}
+        className="export-button"
+      >
+        {loading ? "Extraction en cours..." : "Extraire"}
+      </button>
+      
+      <div>
+      {csvPreview.length > 1 && (
+        <table className="preview-table">
+          <thead>
+            <tr>
+              {csvPreview[0].map((col, i) => (
+                <th key={i}>{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {csvPreview.slice(1).map((row, i) => (
+              <tr key={i}>
+                {row.map((cell, j) => (
+                  <td key={j}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      </div>
+
+      <button
+        onClick={handleExport}
+        disabled={csvPreview.length === 0}
         className="export-button"
       >
         {loading ? "Export en cours..." : "Exporter en CSV"}
