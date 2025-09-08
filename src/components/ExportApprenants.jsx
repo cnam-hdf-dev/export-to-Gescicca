@@ -129,11 +129,11 @@ export default function ExportApprenants() {
           "TYPE_FINANCEMENT_INSCRIPTION",
           // "TYPE_TARIF_INSCRIPTION",
           // "SITUATION_PROFESSIONNELLE",
-          // "STATUT_EMPLOI",
+          "STATUT_EMPLOI",
           // "INSCRIT_POLE_EMPLOI",
           // "COMPTE_ANALYTIQUE",
           "FORMATION",
-          // "ANNEE_FORMATION",
+          "ANNEE_FORMATION",
           // "OPTION_FORMATION",
           "GROUPE_FORMATION",
           "STATUT_INSCRIPTION",
@@ -213,18 +213,18 @@ export default function ExportApprenants() {
           // '',// DIPLOME
           // '',// SITUATION_GEOGRAPHIQUE
           // '',// DISPOSITIF_FINANCEMENT
-          '',// TYPE_FINANCEMENT_INSCRIPTION
+          'C',// TYPE_FINANCEMENT_INSCRIPTION
           // '',// TYPE_TARIF_INSCRIPTION
           // '',// SITUATION_PROFESSIONNELLE
-          // '',// STATUT_EMPLOI
+          '7',// STATUT_EMPLOI
           // '',// INSCRIT_POLE_EMPLOI
           // '',// COMPTE_ANALYTIQUE
           nomFormation, // FORMATION
-          // '',// ANNEE_FORMATION
+          '1',// ANNEE_FORMATION
           // '',// OPTION_FORMATION
           nomGroupe, // GROUPE_FORMATION
-          d.inscriptions[0].codeStatut,// STATUT_INSCRIPTION
-          '',// TYPE_INSCRIPTION
+          'auditeur alternant',// STATUT_INSCRIPTION
+          'APP',// TYPE_INSCRIPTION
           // '',// CODE_UNITE
           // '',// GROUPE_UNITE
           // '',// SEMESTRE_UNITE
@@ -245,11 +245,11 @@ export default function ExportApprenants() {
   };
 
   const handleExport = () => {
-    const blob = new Blob(["\ufeff" + csvPreview.map(r => r.map(v => `"${v !== undefined && v !== null ? v : ""}"`).join(";")).join("\n")], { type: "text/csv;charset=cp1252;" });
+    const blob = new Blob(["\ufeff" + csvPreview.map(r => r.map(v => v !== undefined && v !== null ? v : "").join(";")).join("\n")], { type: "text/csv;charset=cp1252;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `import_Gescicca_groupe_${csvPreview[1][21]}.csv`);
+    link.setAttribute("download", `import_Gescicca_groupe_${csvPreview[1][23]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
