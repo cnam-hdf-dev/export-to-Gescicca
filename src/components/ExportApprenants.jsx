@@ -177,10 +177,10 @@ export default function ExportApprenants() {
           // '',// INE_CNAM
           d.nomApprenant, // NOM
           d.prenomApprenant, // PRENOM
-          d.nomJeuneFille || '',// NOM_USAGE
+          d.nomJeuneFille !== d.nomApprenant ? d.nomJeuneFille : '' || '',// NOM_USAGE
           d.dateNaissance, // DATE_NAISSANCE
-          paysMap[d.codePaysNaissance] || "", // PAYS_NAISSANCE
-          codeInseeNaissance, // LIEU_NAISSANCE
+          paysMap[d.codePaysNaissance] || '', // PAYS_NAISSANCE
+          codeInseeNaissance !== '' ? codeInseeNaissance : d.lieuNaissance, // LIEU_NAISSANCE
           d.adresse?.adr1, // ADRESSE_1
           d.adresse?.adr2 || '', // ADRESSE_2
           codePostal, // CODE_POSTAL
