@@ -21,7 +21,6 @@ const loadReferenceCsv = async (filePath, keyField, valueField) => {
             map[row[keyField]] = row[valueField];
           }
         });
-        console.log(map);
         resolve(map);
       },
     });
@@ -49,7 +48,10 @@ export default function ExportApprenants() {
           headers: { "X-Auth-Token": token },
         });
         const groupesData = await groupesRes.json();
-        setGroupes(Object.values(groupesData));
+        const liste = Object.values(groupesData).sort((a, b) =>
+          (a.nomGroupe || "").localeCompare(b.nomGroupe || "")
+        );
+        setGroupes(liste);
 
         communesMap = await loadReferenceCsv("/ref/liste_communes.csv", "CODE_COMMUNE", "NOMENCL_INSEE");
         nationalitesMap = await loadReferenceCsv("/ref/liste_nationalites.csv", "CODE_NATIONALITE", "ID_BASE_EXTERNE");
@@ -150,17 +152,26 @@ export default function ExportApprenants() {
         ]
       ];
 
-      const apprenantDetails = await Promise.all(
-        apprenants.map((a) =>
-          fetch(`/api/r/v1/apprenants/${a.codeApprenant}`, {
-            headers: {
-              "X-Auth-Token": token,
-            },
-          }).then((res) => res.json())
-        )
-      );
+      // const apprenantDetails = await Promise.all(
+      //   apprenants.map((a) =>
+      //     fetch(`/api/r/v1/apprenants/${a.codeApprenant}`, {
+      //       headers: {
+      //         "X-Auth-Token": token,
+      //       },
+      //     }).then((res) => res.json())
+      //   )
+      // );
 
-      apprenantDetails.forEach((d) => {
+      apprenants.forEach((d) => {
+        const codeInscriptionEnCours = d.informationsCourantes?.codeInscription;
+
+        const inscriptionEnCours = d.inscriptions?.find(i => i.codeInscription === codeInscriptionEnCours);
+        const isInscriptionActive = !inscriptionEnCours?.dateDepart;
+        
+        if (!isInscriptionActive) {
+          return;
+        }
+
         const codeInseeNaissance = formatCodePostal(communesMap[d.codeCommuneNaissance]);
         const codePostal = formatCodePostal(d.adresse?.cp);
 
@@ -275,7 +286,7 @@ export default function ExportApprenants() {
       </select>
 
       <div>
-        <label>Nom exact de la formation dans Gescicca : </label>
+        <label>Nom exact de la formation dans Gescicca : </label><br />
         <input
           type="text"
           value={nomFormation}
@@ -287,7 +298,7 @@ export default function ExportApprenants() {
       <br />
 
       <div>
-        <label>Centre d'enseignement : </label>
+        <label>Centre d'enseignement : </label><br />
         <select
           onChange={(e) => setNomCentreEnseignement(e.target.value)}
           value={nomCentreEnseignement}
@@ -309,7 +320,7 @@ export default function ExportApprenants() {
       </div>
 
       <div>
-        <label>Centre d'attachement : </label>
+        <label>Centre d'attachement : </label><br />
         <select
           onChange={(e) => setNomCentreAttachement(e.target.value)}
           value={nomCentreAttachement}
@@ -348,6 +359,11 @@ export default function ExportApprenants() {
                 ))}
               </tr>
             ))}
+            <tr className="total-row">
+              <td colSpan={csvPreview[0].length}>
+                Total d'apprenants : {csvPreview.length - 1}
+              </td>
+            </tr>
           </tbody>
         </table>
       )}
