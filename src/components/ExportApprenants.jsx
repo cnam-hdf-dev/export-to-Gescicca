@@ -40,6 +40,7 @@ export default function ExportApprenants() {
   const [nomCentreAttachement, setNomCentreAttachement] = useState("");
   const [loading, setLoading] = useState(false);
   const [csvPreview, setCsvPreview] = useState([]);
+  const [editingCell, setEditingCell] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -355,7 +356,29 @@ export default function ExportApprenants() {
             {csvPreview.slice(1).map((row, i) => (
               <tr key={i}>
                 {row.map((cell, j) => (
-                  <td key={j}>{cell}</td>
+                <td key={j} onDoubleClick={() => setEditingCell({ row: i, col: j })}>
+                  {editingCell && editingCell.row === i && editingCell.col === j ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={cell ?? ""}
+                      onBlur={() => setEditingCell(null)}
+                      onChange={(e) => {
+                        const next = [...csvPreview];
+                        next[i + 1] = [...next[i + 1]];
+                        next[i + 1][j] = e.target.value;
+                        setCsvPreview(next);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Escape") {
+                          e.currentTarget.blur();
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span>{cell}</span>
+                  )}
+                </td>
                 ))}
               </tr>
             ))}
