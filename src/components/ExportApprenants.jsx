@@ -186,9 +186,9 @@ export default function ExportApprenants() {
           // '',// NUMERO_SECURITE_SOCIALE
           // '',// INE
           // '',// INE_CNAM
-          d.nomApprenant, // NOM
+          d.nomJeuneFille ? d.nomJeuneFille : d.nomApprenant, // NOM
           d.prenomApprenant, // PRENOM
-          d.nomJeuneFille !== d.nomApprenant ? d.nomJeuneFille : '' || '',// NOM_USAGE
+          (d.nomJeuneFille !== null && d.nomJeuneFille !== '') && d.nomJeuneFille !== d.nomApprenant ? d.nomApprenant : '' || '',// NOM_USAGE
           d.dateNaissance, // DATE_NAISSANCE
           paysMap[d.codePaysNaissance] || '', // PAYS_NAISSANCE
           codeInseeNaissance !== '' ? codeInseeNaissance : d.lieuNaissance, // LIEU_NAISSANCE
