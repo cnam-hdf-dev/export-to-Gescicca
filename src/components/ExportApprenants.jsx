@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import "./ExportApprenants.css";
 import Papa from "papaparse";
+import {
+  DEFAUTS_INSCRIPTION,
+  CENTRES_ENSEIGNEMENT,
+  CENTRES_ATTACHEMENT,
+} from "../config/gesciccaDefaults";
 
 const token = process.env.REACT_APP_API_TOKEN;
 
@@ -217,7 +222,7 @@ export default function ExportApprenants() {
           // '',// RAISON_SOCIALE_ENTREPRISE
           // '',// SIRET_ENTREPRISE
           // '',// IDENTIFIANT_ENTREPRISE
-          '2025',// ANNEE
+          DEFAUTS_INSCRIPTION.ANNEE,// ANNEE
           nomCentreEnseignement,// CENTRE_ENSEIGNEMENT
           nomCentreAttachement,// CENTRE_ATTACHEMENT
           // '',// STATUT_AUDITEUR
@@ -225,18 +230,18 @@ export default function ExportApprenants() {
           // '',// DIPLOME
           // '',// SITUATION_GEOGRAPHIQUE
           // '',// DISPOSITIF_FINANCEMENT
-          'C',// TYPE_FINANCEMENT_INSCRIPTION
+          DEFAUTS_INSCRIPTION.TYPE_FINANCEMENT_INSCRIPTION,// TYPE_FINANCEMENT_INSCRIPTION
           // '',// TYPE_TARIF_INSCRIPTION
           // '',// SITUATION_PROFESSIONNELLE
-          '7',// STATUT_EMPLOI
+          DEFAUTS_INSCRIPTION.STATUT_EMPLOI,// STATUT_EMPLOI
           // '',// INSCRIT_POLE_EMPLOI
           // '',// COMPTE_ANALYTIQUE
           nomFormation, // FORMATION
-          '1',// ANNEE_FORMATION
+          DEFAUTS_INSCRIPTION.ANNEE_FORMATION,// ANNEE_FORMATION
           // '',// OPTION_FORMATION
           nomGroupe, // GROUPE_FORMATION
-          'auditeur alternant',// STATUT_INSCRIPTION
-          'APP',// TYPE_INSCRIPTION
+          DEFAUTS_INSCRIPTION.STATUT_INSCRIPTION,// STATUT_INSCRIPTION
+          DEFAUTS_INSCRIPTION.TYPE_INSCRIPTION,// TYPE_INSCRIPTION
           // '',// CODE_UNITE
           // '',// GROUPE_UNITE
           // '',// SEMESTRE_UNITE
@@ -306,17 +311,9 @@ export default function ExportApprenants() {
           className="export-select"
         >
           <option value="">Sélectionner un centre d'enseignement</option>
-          <option>Batiment Travaux Public</option>
-          <option>Informatique</option>
-          <option>Prévention des Risques, QSE</option>
-          <option>Industrie, Mécanique</option>
-          <option>Santé Action Sociale</option>
-          <option>Commerce Marketing</option>
-          <option>Ressources Humaines</option>
-          <option>Entrepreunariat Management Innovation</option>
-          <option>Logistique Transport</option>
-          <option>Gestion Comptabilite Finance</option>
-          <option>Droit ICH</option>
+          {CENTRES_ENSEIGNEMENT.map((centre) => (
+            <option key={centre}>{centre}</option>
+          ))}
         </select>
       </div>
 
@@ -328,9 +325,9 @@ export default function ExportApprenants() {
           className="export-select"
         >
           <option value="">Sélectionner un centre d'attachement</option>
-          <option>Amiens</option>
-          <option>Lille</option>
-          <option>Valenciennes</option>
+          {CENTRES_ATTACHEMENT.map((centre) => (
+            <option key={centre}>{centre}</option>
+          ))}
         </select>
       </div>      
       
