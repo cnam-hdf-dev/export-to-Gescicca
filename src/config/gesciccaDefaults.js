@@ -26,3 +26,10 @@ export const CENTRES_ENSEIGNEMENT = [
 ];
 
 export const CENTRES_ATTACHEMENT = ["Amiens", "Lille", "Valenciennes"];
+
+// Sérialisation du CSV d'import Gescicca.
+export const SEPARATEUR = ";";
+// Caractère de protection paramétré dans l'interface d'import Gescicca :
+// chaque séparateur présent dans une valeur est encadré par ce caractère
+// (ex. "a;b" -> "a\;\b"). À réaligner si le paramétrage Gescicca change.
+export const SEPARATEUR_PROTECTION = "\\";

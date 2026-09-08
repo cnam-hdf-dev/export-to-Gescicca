@@ -5,6 +5,8 @@ import {
   DEFAUTS_INSCRIPTION,
   CENTRES_ENSEIGNEMENT,
   CENTRES_ATTACHEMENT,
+  SEPARATEUR,
+  SEPARATEUR_PROTECTION,
 } from "../config/gesciccaDefaults";
 
 const token = process.env.REACT_APP_API_TOKEN;
@@ -35,6 +37,18 @@ const loadReferenceCsv = async (filePath, keyField, valueField) => {
 const formatCodePostal = (val) => {
   if (val === undefined || val === null || val === "") return "";
   return String(val).padStart(5, "0");
+};
+
+// Protège le séparateur à l'intérieur d'une valeur, selon le mécanisme
+// d'import Gescicca : chaque séparateur interne est encadré par le
+// caractère de protection paramétré. Les valeurs sans séparateur sont
+// renvoyées inchangées (sortie identique à l'existant).
+const protegerSeparateur = (val) => {
+  const s = val !== undefined && val !== null ? String(val) : "";
+  if (!s.includes(SEPARATEUR)) return s;
+  return s
+    .split(SEPARATEUR)
+    .join(SEPARATEUR_PROTECTION + SEPARATEUR + SEPARATEUR_PROTECTION);
 };
 
 // Rend un libellé utilisable comme nom de fichier (retire accents et
@@ -278,7 +292,7 @@ export default function ExportApprenants() {
   };
 
   const handleExport = () => {
-    const blob = new Blob(["\ufeff" + csvPreview.map(r => r.map(v => v !== undefined && v !== null ? v : "").join(";")).join("\n")], { type: "text/csv;charset=cp1252;" });
+    const blob = new Blob(["\ufeff" + csvPreview.map(r => r.map(protegerSeparateur).join(SEPARATEUR)).join("\n")], { type: "text/csv;charset=cp1252;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
