@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./ExportApprenants.css";
 import Papa from "papaparse";
 import {
@@ -13,10 +13,6 @@ import {
 } from "../config/gesciccaDefaults";
 
 const token = process.env.REACT_APP_API_TOKEN;
-
-let communesMap = {};
-let nationalitesMap = {};
-let paysMap = {};
 
 const loadReferenceCsv = async (filePath, keyField, valueField) => {
   return new Promise((resolve) => {
@@ -80,6 +76,10 @@ export default function ExportApprenants() {
   const [nomGroupeExport, setNomGroupeExport] = useState("");
   const [editingCell, setEditingCell] = useState(null);
 
+  // Tables de correspondance Yparéo -> Gescicca, chargées une fois au montage.
+  const referencesRef = useRef({ communes: {}, nationalites: {}, pays: {} });
+  const [referencesChargees, setReferencesChargees] = useState(false);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -92,9 +92,13 @@ export default function ExportApprenants() {
         );
         setGroupes(liste);
 
-        communesMap = await loadReferenceCsv("/ref/liste_communes.csv", "CODE_COMMUNE", "NOMENCL_INSEE");
-        nationalitesMap = await loadReferenceCsv("/ref/liste_nationalites.csv", "CODE_NATIONALITE", "ID_BASE_EXTERNE");
-        paysMap = await loadReferenceCsv("/ref/liste_pays.csv", "CODE_PAYS", "ID_BASE_EXTERNE");
+        const [communes, nationalites, pays] = await Promise.all([
+          loadReferenceCsv("/ref/liste_communes.csv", "CODE_COMMUNE", "NOMENCL_INSEE"),
+          loadReferenceCsv("/ref/liste_nationalites.csv", "CODE_NATIONALITE", "ID_BASE_EXTERNE"),
+          loadReferenceCsv("/ref/liste_pays.csv", "CODE_PAYS", "ID_BASE_EXTERNE"),
+        ]);
+        referencesRef.current = { communes, nationalites, pays };
+        setReferencesChargees(true);
       } catch (err) {
         console.error("Erreur lors du chargement initial :", err);
       }
@@ -201,24 +205,26 @@ export default function ExportApprenants() {
       //   )
       // );
 
+      const { communes, nationalites, pays } = referencesRef.current;
+
       apprenants.forEach((d) => {
         const codeInscriptionEnCours = d.informationsCourantes?.codeInscription;
 
         const inscriptionEnCours = d.inscriptions?.find(i => i.codeInscription === codeInscriptionEnCours);
         const isInscriptionActive = !inscriptionEnCours?.dateDepart;
-        
+
         if (!isInscriptionActive) {
           return;
         }
 
-        const codeInseeNaissance = formatCodePostal(communesMap[d.codeCommuneNaissance]);
+        const codeInseeNaissance = formatCodePostal(communes[d.codeCommuneNaissance]);
         const codePostal = formatCodePostal(d.adresse?.cp);
 
         csvRows.push([
           d.codeCivilite, // TITRE
           // '',// INDEMNISATION
           // '',// EXPERIENCE
-          nationalitesMap[d.codeNationalite] || "", // CODE_NATIONALITE
+          nationalites[d.codeNationalite] || "", // CODE_NATIONALITE
           // '',// SITUATION_FAMILIALE
           // '',// PROFESSION_INSEE
           // '',// ANCIEN_CODE_AUDITEUR
@@ -229,7 +235,7 @@ export default function ExportApprenants() {
           d.prenomApprenant, // PRENOM
           (d.nomJeuneFille !== null && d.nomJeuneFille !== '') && d.nomJeuneFille !== d.nomApprenant ? d.nomApprenant : '' || '',// NOM_USAGE
           d.dateNaissance, // DATE_NAISSANCE
-          paysMap[d.codePaysNaissance] || '', // PAYS_NAISSANCE
+          pays[d.codePaysNaissance] || '', // PAYS_NAISSANCE
           codeInseeNaissance !== '' ? codeInseeNaissance : d.lieuNaissance, // LIEU_NAISSANCE
           d.adresse?.adr1, // ADRESSE_1
           d.adresse?.adr2 || '', // ADRESSE_2
@@ -383,10 +389,14 @@ export default function ExportApprenants() {
       
       <button
         onClick={handleExtract}
-        disabled={loading || !selectedGroupe}
+        disabled={loading || !selectedGroupe || !referencesChargees}
         className="export-button"
       >
-        {loading ? "Extraction en cours..." : "Extraire"}
+        {loading
+          ? "Extraction en cours..."
+          : referencesChargees
+          ? "Extraire"
+          : "Chargement des référentiels..."}
       </button>
       
       <div>
