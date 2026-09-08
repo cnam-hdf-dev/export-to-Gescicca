@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import "./ExportApprenants.css";
 import Papa from "papaparse";
+import { validerLigne } from "../gesciccaValidation";
 import {
   DEFAUTS_INSCRIPTION,
   ANNEES,
@@ -172,6 +173,24 @@ export default function ExportApprenants() {
       setGroupeOuvert(false);
     }
   };
+
+  // Validation des lignes de l'aperçu (recalculée à chaque édition de cellule).
+  const erreursParLigne = useMemo(() => {
+    if (csvPreview.length <= 1) return [];
+    const entetes = csvPreview[0];
+    return csvPreview.slice(1).map((row) => {
+      const ligne = {};
+      entetes.forEach((col, j) => {
+        ligne[col] = row[j];
+      });
+      return validerLigne(ligne);
+    });
+  }, [csvPreview]);
+
+  const nbCellulesFautives = erreursParLigne.reduce(
+    (total, err) => total + Object.keys(err).length,
+    0
+  );
 
   const handleExtract = async () => {
     const groupeInfo = groupes.find(g => g.codeGroupe.toString() === selectedGroupe);
@@ -519,8 +538,15 @@ export default function ExportApprenants() {
           <tbody>
             {csvPreview.slice(1).map((row, i) => (
               <tr key={i}>
-                {row.map((cell, j) => (
-                <td key={j} onDoubleClick={() => setEditingCell({ row: i, col: j })}>
+                {row.map((cell, j) => {
+                const erreur = erreursParLigne[i]?.[csvPreview[0][j]];
+                return (
+                <td
+                  key={j}
+                  className={erreur ? "cellule-fautive" : undefined}
+                  title={erreur || undefined}
+                  onDoubleClick={() => setEditingCell({ row: i, col: j })}
+                >
                   {editingCell && editingCell.row === i && editingCell.col === j ? (
                     <input
                       type="text"
@@ -543,7 +569,8 @@ export default function ExportApprenants() {
                     <span>{cell}</span>
                   )}
                 </td>
-                ))}
+                );
+                })}
               </tr>
             ))}
             <tr className="total-row">
@@ -558,11 +585,16 @@ export default function ExportApprenants() {
 
       <button
         onClick={handleExport}
-        disabled={csvPreview.length <= 1}
+        disabled={csvPreview.length <= 1 || nbCellulesFautives > 0}
         className="export-button"
       >
         {loading ? "Export en cours..." : "Exporter en CSV"}
       </button>
+      {nbCellulesFautives > 0 && (
+        <p className="export-erreur">
+          Corrigez les cellules en rouge pour activer l'export.
+        </p>
+      )}
     </div>
   );
 }

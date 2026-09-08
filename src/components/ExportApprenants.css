@@ -50,6 +50,16 @@
   color: #888;
 }
 
+.preview-table td.cellule-fautive {
+  background-color: #fde2e2;
+}
+
+.export-erreur {
+  color: #b3261e;
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
 .export-button {
   padding: 10px 16px;
   margin-top: 10px;
