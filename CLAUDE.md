@@ -17,9 +17,10 @@ Le flux : l'utilisateur choisit un groupe de formation longue → l'app extrait 
 npm install        # dépendances (Create React App, non éjecté)
 npm start          # serveur de dev sur http://localhost:3000 (avec proxy /api, cf. ci-dessous)
 npm run build      # build de production dans build/
-npm test           # runner de tests CRA (watch). Test unique : npm test -- ExportApprenants
+npm test           # runner de tests CRA (watch). Test ciblé : npm test -- gesciccaValidation
 ```
 
+> `src/gesciccaValidation.test.js` couvre la fonction pure de validation.
 > `src/App.test.js` est encore le test généré par CRA et **échoue** (il cherche un lien « learn react » absent). À remplacer ou supprimer.
 
 ## Configuration
@@ -44,13 +45,13 @@ Ces deux fichiers sont volontairement hors dépôt (dérivés de docs propriéta
 
 ## Architecture
 
-Toute la logique tient dans **un seul composant** : `src/components/ExportApprenants.jsx` (`App.js` ne fait que le monter). ~400 lignes, 3 responsabilités enchaînées.
+La logique tient dans **un composant** : `src/components/ExportApprenants.jsx` (`App.js` ne fait que le monter), épaulé par deux modules : `src/config/gesciccaDefaults.js` (valeurs externalisées) et `src/gesciccaValidation.js` (validation des lignes, fonction pure).
 
 Les valeurs métier externalisées sont dans **`src/config/gesciccaDefaults.js`** : `DEFAUTS_INSCRIPTION` (valeurs par défaut des colonnes d'inscription encore figées), `ANNEES` / `ANNEE_DEFAUT` (sélecteur d'année universitaire, calculés au chargement), `CENTRES_ENSEIGNEMENT` / `CENTRE_ENSEIGNEMENT_DEFAUT` / `CENTRES_ATTACHEMENT` (listes des sélecteurs), `SEPARATEUR` / `SEPARATEUR_PROTECTION` (sérialisation CSV). C'est le point d'entrée pour ajuster ces valeurs sans toucher au composant.
 
 ### 1. Chargement initial (`useEffect`)
 
-- `GET /api/r/v1/formation-longue/groupes` → liste déroulante des groupes (triée par `nomGroupe`).
+- `GET /api/r/v1/formation-longue/groupes` → alimente le **combobox de recherche du groupe** (input + liste filtrée `groupesFiltres`, filtrage insensible casse/accents via `sansAccents` / `libelleGroupe`, navigation clavier, fermeture au clic extérieur). `selectedGroupe` (code) reste la source de vérité, vidé dès qu'on édite le texte, reposé à la sélection d'une entrée.
 - Chargement en parallèle (`Promise.all`) des 3 CSV de référence de `public/ref/` via `papaparse`, transformés en dictionnaires stockés dans `referencesRef` (`useRef`, donc préservé au Fast Refresh). `referencesChargees` (state) passe à `true` une fois les 3 chargés ; le bouton « Extraire » reste désactivé tant que non chargé.
 
 | Fichier | Clé | Valeur | Usage |
@@ -72,10 +73,13 @@ Règles de transformation notables :
 - **Lieu de naissance** : code INSEE via la table `communes` de `referencesRef`, sinon libellé `lieuNaissance`.
 - **Codes postaux et INSEE** : `formatCodePostal` = `String(val).padStart(5, "0")` (mal nommé : sert aussi au code INSEE).
 
-### 3. Aperçu éditable + export
+### 3. Aperçu éditable + validation + export
 
 - Rendu en `<table>` ; **double-clic sur une cellule** → `<input>` contrôlé qui réécrit directement `csvPreview`. Ligne finale « Total d'apprenants ».
+- **Validation** : `erreursParLigne` (`useMemo` sur `csvPreview`, recalculé à chaque édition) reconstruit chaque ligne en `{ COLONNE: valeur }` via l'en-tête et appelle `validerLigne` de `src/gesciccaValidation.js`. Chaque `<td>` fautive reçoit la classe `cellule-fautive` (fond rouge clair) + un `title` explicatif. Le bouton « Exporter en CSV » est désactivé tant qu'il reste une cellule fautive.
 - `handleExport` : sérialisation via `protegerSeparateur` (encadre chaque `;` interne d'une valeur par le caractère de protection Gescicca, cf. `SEPARATEUR_PROTECTION`), BOM `﻿` en tête, `Blob` téléchargé via un `<a download>` créé à la volée. Nom de fichier : `import_Gescicca_groupe_${sanitizeNomFichier(nomGroupeExport)}.csv` (le libellé du groupe est mémorisé dans un state à l'extraction, plus d'index positionnel).
+
+**`src/gesciccaValidation.js`** — `validerLigne(ligne)` applique les règles de la spec Gescicca v2.4 : champs obligatoires, jeux de valeurs de référence (`TITRE`, `TYPE_FINANCEMENT_INSCRIPTION`, `STATUT_EMPLOI`, `STATUT_INSCRIPTION`, `TYPE_INSCRIPTION`), formats (date, e-mail, `CODE_POSTAL`/INSEE, `ANNEE`), règles de caractères (NOM/PRÉNOM ; ADRESSE avec chiffres ; VILLE sans chiffres), longueurs max, dépendances inter-colonnes (`CODE_POSTAL`↔`PAYS`, `LIEU_NAISSANCE`↔`PAYS_NAISSANCE`), codes `990`/`995` interdits pour `PAYS_NAISSANCE` et `CODE_NATIONALITE`, appartenance des centres aux listes de `gesciccaDefaults.js`. Non couvert (faute de référentiel) : libellés exacts `FORMATION` / `GROUPE_FORMATION`, validité réelle des codes `CODE_NATIONALITE` / `PAYS_NAISSANCE` / `PAYS` (seulement « non vide » / numérique).
 
 ## Points d'attention connus / pistes d'évolution
 
@@ -84,7 +88,7 @@ Règles de transformation notables :
 - **Incohérence d'encodage** : BOM UTF-8 écrit mais `Blob` typé `charset=cp1252`. À trancher par un test d'import réel.
 - **Aucune erreur remontée à l'UI** en cas d'échec `fetch` (seulement `console.error`).
 
-Déjà traité : nom de fichier via index magique `csvPreview[1][23]` (→ `sanitizeNomFichier(nomGroupeExport)`), échappement du séparateur `;` (→ `protegerSeparateur`), race au chargement des référentiels (→ `referencesRef` + `referencesChargees`).
+Déjà traité : nom de fichier via index magique `csvPreview[1][23]` (→ `sanitizeNomFichier(nomGroupeExport)`), échappement du séparateur `;` (→ `protegerSeparateur`), race au chargement des référentiels (→ `referencesRef` + `referencesChargees`), validation des lignes avant export avec surlignage des cellules fautives (→ `src/gesciccaValidation.js`, cf. §3).
 
 ### Priorité 2 — valeurs codées en dur à dériver de la situation contractuelle
 
@@ -115,10 +119,6 @@ Correspondances cibles indicatives : apprentissage → `APP` / `C` / dispositif 
 - `GET /r/v1/entreprises/{codeEntreprise}` → `siret`, `nomEntreprise` → colonnes `SIRET_ENTREPRISE` / `RAISON_SOCIALE_ENTREPRISE` (Gescicca rattache l'auditeur à l'employeur en alternance).
 - Référentiels `GET /r/v1/statuts`, `/annees`, `/periodes`, `/diplomes-prepares` mis en cache comme les CSV `public/ref/`.
 - Filtrer côté API : `formation-longue/groupes?@filtre=codesSite=…&@filtre=codesPeriode=…` (format filtre Yparéo : `?@filtre=X&@filtre=Y`, suffixe `[]` = valeurs multiples séparées par virgules).
-
-### Priorité 4 — validation avant export
-
-Contrôler dans l'aperçu (surligner les cellules fautives) les règles de la spec Gescicca : champs obligatoires (`TITRE`, `CODE_NATIONALITE`, `NOM`, `PRENOM`, `DATE_NAISSANCE`, `PAYS_NAISSANCE`, `LIEU_NAISSANCE`, `ADRESSE_1`, `CODE_POSTAL`, `VILLE`, `PAYS`, `COURRIEL_PERSONNEL`), formats (`CODE_POSTAL` = `99999` si France, email valide, dates `JJ/MM/AAAA`), `LIEU_NAISSANCE` = code INSEE si `PAYS_NAISSANCE` = `0` sinon nom de ville, `PAYS_NAISSANCE` ≠ `990`/`995`.
 
 ### Refactor structurant
 
