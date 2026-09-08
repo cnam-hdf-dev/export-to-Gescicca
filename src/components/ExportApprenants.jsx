@@ -87,6 +87,8 @@ export default function ExportApprenants() {
   const [csvPreview, setCsvPreview] = useState([]);
   const [nomGroupeExport, setNomGroupeExport] = useState("");
   const [editingCell, setEditingCell] = useState(null);
+  // Indices (0-based dans csvPreview.slice(1)) des lignes cochées pour l'export.
+  const [lignesSelectionnees, setLignesSelectionnees] = useState(() => new Set());
 
   // Combobox de recherche du groupe.
   const [rechercheGroupe, setRechercheGroupe] = useState("");
@@ -187,10 +189,28 @@ export default function ExportApprenants() {
     });
   }, [csvPreview]);
 
-  const nbCellulesFautives = erreursParLigne.reduce(
-    (total, err) => total + Object.keys(err).length,
-    0
-  );
+  const nbLignes = Math.max(csvPreview.length - 1, 0);
+  const ligneEstFautive = (i) =>
+    erreursParLigne[i] && Object.keys(erreursParLigne[i]).length > 0;
+  const toutSelectionne = nbLignes > 0 && lignesSelectionnees.size === nbLignes;
+  const selectionPartielle =
+    lignesSelectionnees.size > 0 && !toutSelectionne;
+  const selectionContientErreur = [...lignesSelectionnees].some(ligneEstFautive);
+
+  const basculerLigne = (i) => {
+    setLignesSelectionnees((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(i)) suivant.delete(i);
+      else suivant.add(i);
+      return suivant;
+    });
+  };
+
+  const basculerToutes = () => {
+    setLignesSelectionnees(
+      toutSelectionne ? new Set() : new Set(Array.from({ length: nbLignes }, (_, i) => i))
+    );
+  };
 
   const handleExtract = async () => {
     const groupeInfo = groupes.find(g => g.codeGroupe.toString() === selectedGroupe);
@@ -379,6 +399,7 @@ export default function ExportApprenants() {
       });
       setCsvPreview(csvRows);
       setNomGroupeExport(nomGroupe || selectedGroupe);
+      setLignesSelectionnees(new Set());
     } catch (err) {
       console.error("Erreur export:", err);
     } finally {
@@ -387,7 +408,11 @@ export default function ExportApprenants() {
   };
 
   const handleExport = () => {
-    const blob = new Blob(["\ufeff" + csvPreview.map(r => r.map(protegerSeparateur).join(SEPARATEUR)).join("\n")], { type: "text/csv;charset=cp1252;" });
+    const lignesAExporter = [
+      csvPreview[0],
+      ...csvPreview.slice(1).filter((_, i) => lignesSelectionnees.has(i)),
+    ];
+    const blob = new Blob(["\ufeff" + lignesAExporter.map(r => r.map(protegerSeparateur).join(SEPARATEUR)).join("\n")], { type: "text/csv;charset=cp1252;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -530,6 +555,17 @@ export default function ExportApprenants() {
         <table className="preview-table">
           <thead>
             <tr>
+              <th className="col-selection">
+                <input
+                  type="checkbox"
+                  checked={toutSelectionne}
+                  ref={(el) => {
+                    if (el) el.indeterminate = selectionPartielle;
+                  }}
+                  onChange={basculerToutes}
+                  aria-label="Tout sélectionner"
+                />
+              </th>
               {csvPreview[0].map((col, i) => (
                 <th key={i}>{col}</th>
               ))}
@@ -537,7 +573,18 @@ export default function ExportApprenants() {
           </thead>
           <tbody>
             {csvPreview.slice(1).map((row, i) => (
-              <tr key={i}>
+              <tr
+                key={i}
+                className={lignesSelectionnees.has(i) ? "ligne-selectionnee" : undefined}
+              >
+                <td className="col-selection">
+                  <input
+                    type="checkbox"
+                    checked={lignesSelectionnees.has(i)}
+                    onChange={() => basculerLigne(i)}
+                    aria-label={`Sélectionner la ligne ${i + 1}`}
+                  />
+                </td>
                 {row.map((cell, j) => {
                 const erreur = erreursParLigne[i]?.[csvPreview[0][j]];
                 return (
@@ -574,8 +621,8 @@ export default function ExportApprenants() {
               </tr>
             ))}
             <tr className="total-row">
-              <td colSpan={csvPreview[0].length}>
-                Total d'apprenants : {csvPreview.length - 1}
+              <td colSpan={csvPreview[0].length + 1}>
+                {lignesSelectionnees.size} sélectionnée(s) / {nbLignes} apprenant(s)
               </td>
             </tr>
           </tbody>
@@ -585,14 +632,23 @@ export default function ExportApprenants() {
 
       <button
         onClick={handleExport}
-        disabled={csvPreview.length <= 1 || nbCellulesFautives > 0}
+        disabled={
+          csvPreview.length <= 1 ||
+          lignesSelectionnees.size === 0 ||
+          selectionContientErreur
+        }
         className="export-button"
       >
         {loading ? "Export en cours..." : "Exporter en CSV"}
       </button>
-      {nbCellulesFautives > 0 && (
+      {csvPreview.length > 1 && lignesSelectionnees.size === 0 && (
         <p className="export-erreur">
-          Corrigez les cellules en rouge pour activer l'export.
+          Sélectionnez au moins une ligne à exporter.
+        </p>
+      )}
+      {selectionContientErreur && (
+        <p className="export-erreur">
+          Une ligne sélectionnée contient des cellules à corriger (en rouge).
         </p>
       )}
     </div>

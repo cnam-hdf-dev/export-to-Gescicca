@@ -54,6 +54,16 @@
   background-color: #fde2e2;
 }
 
+.preview-table .col-selection {
+  width: 1%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.preview-table tr.ligne-selectionnee {
+  background-color: #eef6ff;
+}
+
 .export-erreur {
   color: #b3261e;
   margin: 8px 0 0;
