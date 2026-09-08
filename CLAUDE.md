@@ -79,7 +79,6 @@ Règles de transformation notables :
 
 ### Priorité 1 — corrections
 
-- **`DISPOSITIF_FINANCEMENT` manquant** : le CSV envoie toujours `TYPE_FINANCEMENT_INSCRIPTION = 'C'` mais jamais `DISPOSITIF_FINANCEMENT`, que la spec Gescicca rend **obligatoire dès que le financement = `C`**. Risque de rejet à l'import.
 - **Nom de fichier via index magique** `csvPreview[1][23]` : casse dès qu'on (dé)commente une colonne, et ne correspond plus au nombre actuel de colonnes actives.
 - **Échappement du séparateur** : `handleExport` fait un simple `join(";")`. Une valeur contenant `;` (adresse, mémo…) casse la ligne. La spec impose de protéger le `;` par un caractère défini dans l'interface Gescicca.
 - **Incohérence d'encodage** : BOM UTF-8 écrit mais `Blob` typé `charset=cp1252`. À trancher par un test d'import réel.

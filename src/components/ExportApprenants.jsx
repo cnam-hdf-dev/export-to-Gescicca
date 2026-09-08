@@ -37,6 +37,20 @@ const formatCodePostal = (val) => {
   return String(val).padStart(5, "0");
 };
 
+// Rend un libellé utilisable comme nom de fichier (retire accents et
+// caractères interdits, replie les espaces/underscores).
+const sanitizeNomFichier = (val, fallback = "groupe") => {
+  const nettoye = String(val ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+  return nettoye || fallback;
+};
+
 export default function ExportApprenants() {
   const [groupes, setGroupes] = useState([]);
   const [selectedGroupe, setSelectedGroupe] = useState("");
@@ -45,6 +59,7 @@ export default function ExportApprenants() {
   const [nomCentreAttachement, setNomCentreAttachement] = useState("");
   const [loading, setLoading] = useState(false);
   const [csvPreview, setCsvPreview] = useState([]);
+  const [nomGroupeExport, setNomGroupeExport] = useState("");
   const [editingCell, setEditingCell] = useState(null);
 
   useEffect(() => {
@@ -254,6 +269,7 @@ export default function ExportApprenants() {
         ]);
       });
       setCsvPreview(csvRows);
+      setNomGroupeExport(nomGroupe || selectedGroupe);
     } catch (err) {
       console.error("Erreur export:", err);
     } finally {
@@ -266,7 +282,10 @@ export default function ExportApprenants() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `import_Gescicca_groupe_${csvPreview[1][23]}.csv`);
+    link.setAttribute(
+      "download",
+      `import_Gescicca_groupe_${sanitizeNomFichier(nomGroupeExport)}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -391,7 +410,7 @@ export default function ExportApprenants() {
 
       <button
         onClick={handleExport}
-        disabled={csvPreview.length === 0}
+        disabled={csvPreview.length <= 1}
         className="export-button"
       >
         {loading ? "Export en cours..." : "Exporter en CSV"}
