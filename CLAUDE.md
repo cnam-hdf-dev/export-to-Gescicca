@@ -44,12 +44,14 @@ Ces deux fichiers sont volontairement hors dépôt (dérivés de docs propriéta
 
 ## Architecture
 
-Toute la logique tient dans **un seul composant** : `src/components/ExportApprenants.jsx` (`App.js` ne fait que le monter). ~400 lignes, 3 responsabilités enchaînées :
+Toute la logique tient dans **un seul composant** : `src/components/ExportApprenants.jsx` (`App.js` ne fait que le monter). ~400 lignes, 3 responsabilités enchaînées.
+
+Les valeurs métier externalisées sont dans **`src/config/gesciccaDefaults.js`** : `DEFAUTS_INSCRIPTION` (valeurs par défaut des colonnes d'inscription encore figées), `ANNEES` / `ANNEE_DEFAUT` (sélecteur d'année universitaire, calculés au chargement), `CENTRES_ENSEIGNEMENT` / `CENTRE_ENSEIGNEMENT_DEFAUT` / `CENTRES_ATTACHEMENT` (listes des sélecteurs), `SEPARATEUR` / `SEPARATEUR_PROTECTION` (sérialisation CSV). C'est le point d'entrée pour ajuster ces valeurs sans toucher au composant.
 
 ### 1. Chargement initial (`useEffect`)
 
 - `GET /api/r/v1/formation-longue/groupes` → liste déroulante des groupes (triée par `nomGroupe`).
-- Chargement des 3 CSV de référence de `public/ref/` via `papaparse`, transformés en dictionnaires **stockés dans des variables de module mutables** (`communesMap`, `nationalitesMap`, `paysMap`) :
+- Chargement en parallèle (`Promise.all`) des 3 CSV de référence de `public/ref/` via `papaparse`, transformés en dictionnaires stockés dans `referencesRef` (`useRef`, donc préservé au Fast Refresh). `referencesChargees` (state) passe à `true` une fois les 3 chargés ; le bouton « Extraire » reste désactivé tant que non chargé.
 
 | Fichier | Clé | Valeur | Usage |
 |---|---|---|---|
@@ -67,23 +69,22 @@ Toute la logique tient dans **un seul composant** : `src/components/ExportAppren
 Règles de transformation notables :
 
 - **Nom / nom d'usage** : `NOM` = `nomJeuneFille` si présent, sinon `nomApprenant`. `NOM_USAGE` = `nomApprenant` seulement si `nomJeuneFille` existe **et** diffère.
-- **Lieu de naissance** : code INSEE via `communesMap`, sinon libellé `lieuNaissance`.
+- **Lieu de naissance** : code INSEE via la table `communes` de `referencesRef`, sinon libellé `lieuNaissance`.
 - **Codes postaux et INSEE** : `formatCodePostal` = `String(val).padStart(5, "0")` (mal nommé : sert aussi au code INSEE).
 
 ### 3. Aperçu éditable + export
 
 - Rendu en `<table>` ; **double-clic sur une cellule** → `<input>` contrôlé qui réécrit directement `csvPreview`. Ligne finale « Total d'apprenants ».
-- `handleExport` : sérialisation manuelle `join(";")`, BOM `﻿` en tête, `Blob` téléchargé via un `<a download>` créé à la volée. Nom de fichier : `import_Gescicca_groupe_${csvPreview[1][23]}.csv`.
+- `handleExport` : sérialisation via `protegerSeparateur` (encadre chaque `;` interne d'une valeur par le caractère de protection Gescicca, cf. `SEPARATEUR_PROTECTION`), BOM `﻿` en tête, `Blob` téléchargé via un `<a download>` créé à la volée. Nom de fichier : `import_Gescicca_groupe_${sanitizeNomFichier(nomGroupeExport)}.csv` (le libellé du groupe est mémorisé dans un state à l'extraction, plus d'index positionnel).
 
 ## Points d'attention connus / pistes d'évolution
 
 ### Priorité 1 — corrections
 
-- **Nom de fichier via index magique** `csvPreview[1][23]` : casse dès qu'on (dé)commente une colonne, et ne correspond plus au nombre actuel de colonnes actives.
-- **Échappement du séparateur** : `handleExport` fait un simple `join(";")`. Une valeur contenant `;` (adresse, mémo…) casse la ligne. La spec impose de protéger le `;` par un caractère défini dans l'interface Gescicca.
 - **Incohérence d'encodage** : BOM UTF-8 écrit mais `Blob` typé `charset=cp1252`. À trancher par un test d'import réel.
-- **Race au chargement** : `communesMap` / `nationalitesMap` / `paysMap` sont des globales de module remplies dans un `useEffect` async ; `handleExtract` peut s'exécuter avant. Les passer en `state`/`useRef` et ne débloquer « Extraire » qu'une fois chargées.
 - **Aucune erreur remontée à l'UI** en cas d'échec `fetch` (seulement `console.error`).
+
+Déjà traité : nom de fichier via index magique `csvPreview[1][23]` (→ `sanitizeNomFichier(nomGroupeExport)`), échappement du séparateur `;` (→ `protegerSeparateur`), race au chargement des référentiels (→ `referencesRef` + `referencesChargees`).
 
 ### Priorité 2 — valeurs codées en dur à dériver de la situation contractuelle
 
@@ -91,7 +92,6 @@ Colonnes actuellement figées dans `handleExtract` :
 
 | Colonne | Valeur figée | Devrait dépendre de |
 |---|---|---|
-| `ANNEE` | `'2025'` | période de l'inscription / paramètre utilisateur |
 | `ANNEE_FORMATION` | `'1'` | `inscription.annee` (Yparéo) |
 | `TYPE_FINANCEMENT_INSCRIPTION` | `'C'` | situation contractuelle |
 | `STATUT_EMPLOI` | `'7'` (apprenti sous contrat) | type de contrat |
@@ -102,7 +102,7 @@ Colonnes actuellement figées dans `handleExtract` :
 
 - `inscriptionEnCours.statut.nomStatut` / `.abregeStatut` + les booléens `isFacturableNpec` / `isFacturableContrat` (→ alternance) vs `isFacturableFormation` (→ formation continue).
 - `inscriptionEnCours.annee` → `ANNEE_FORMATION`.
-- `inscriptionEnCours.codePeriode` / `.situation` → `ANNEE`, situation.
+- `inscriptionEnCours.codePeriode` / `.situation` → pourrait préremplir le sélecteur `ANNEE` et la situation.
 - `isInscriptionEnCours` (`wrInscription`) : repère l'inscription courante plus directement que le calcul actuel.
 
 **Approche recommandée** : externaliser les règles dans un `public/ref/mapping_statuts.csv` (chargé comme les autres réfs), colonnes du type `CODE_STATUT_YPAREO ; NOM_STATUT ; STATUT_INSCRIPTION ; TYPE_INSCRIPTION ; TYPE_FINANCEMENT_INSCRIPTION ; DISPOSITIF_FINANCEMENT ; STATUT_EMPLOI`. Le gestionnaire maintient le fichier, le code ne bouge pas. Valider les libellés avec le contenu réel de `GET /r/v1/statuts` de l'instance.
@@ -122,7 +122,7 @@ Contrôler dans l'aperçu (surligner les cellules fautives) les règles de la sp
 
 ### Refactor structurant
 
-Représenter chaque ligne comme un **objet `{ NOM_COLONNE: valeur }`** + une liste ordonnée de colonnes unique dont dérivent l'aperçu et le CSV. Supprime l'index magique `[23]`, la maintenance des colonnes commentées, et rend le mapping par clé (dont la logique contractuelle ci-dessus) nettement plus lisible. Bon candidat à extraire en fonction pure `wrApprenant → ligne`, testable unitairement.
+Représenter chaque ligne comme un **objet `{ NOM_COLONNE: valeur }`** + une liste ordonnée de colonnes unique dont dérivent l'aperçu et le CSV. Supprime les accès positionnels restants (`csvPreview[0]`, `.slice(1)`, tableau en-têtes / lignes tenus en parallèle), la maintenance des colonnes commentées, et rend le mapping par clé (dont la logique contractuelle ci-dessus) nettement plus lisible. Bon candidat à extraire en fonction pure `wrApprenant → ligne`, testable unitairement.
 
 ## Divers
 
