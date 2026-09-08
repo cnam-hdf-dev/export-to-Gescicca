@@ -75,9 +75,11 @@ Règles de transformation notables :
 
 ### 3. Aperçu éditable + validation + export
 
-- Rendu en `<table>` ; **double-clic sur une cellule** → `<input>` contrôlé qui réécrit directement `csvPreview`. Ligne finale « Total d'apprenants ».
-- **Validation** : `erreursParLigne` (`useMemo` sur `csvPreview`, recalculé à chaque édition) reconstruit chaque ligne en `{ COLONNE: valeur }` via l'en-tête et appelle `validerLigne` de `src/gesciccaValidation.js`. Chaque `<td>` fautive reçoit la classe `cellule-fautive` (fond rouge clair) + un `title` explicatif. Le bouton « Exporter en CSV » est désactivé tant qu'il reste une cellule fautive.
-- `handleExport` : sérialisation via `protegerSeparateur` (encadre chaque `;` interne d'une valeur par le caractère de protection Gescicca, cf. `SEPARATEUR_PROTECTION`), BOM `﻿` en tête, `Blob` téléchargé via un `<a download>` créé à la volée. Nom de fichier : `import_Gescicca_groupe_${sanitizeNomFichier(nomGroupeExport)}.csv` (le libellé du groupe est mémorisé dans un state à l'extraction, plus d'index positionnel).
+- Rendu en `<table>` ; **double-clic sur une cellule** → `<input>` contrôlé qui réécrit directement `csvPreview`.
+- **Sélection des lignes** : 1re colonne de cases à cocher (`lignesSelectionnees`, `Set` d'indices ; remis à zéro à chaque extraction → rien de coché par défaut), plus une case d'en-tête « tout (dé)sélectionner » avec état indéterminé si sélection partielle. Pied de tableau : « N sélectionnée(s) / M apprenant(s) ».
+- **Validation** : `erreursParLigne` (`useMemo` sur `csvPreview`, recalculé à chaque édition) reconstruit chaque ligne en `{ COLONNE: valeur }` via l'en-tête et appelle `validerLigne` de `src/gesciccaValidation.js`. Chaque `<td>` fautive reçoit la classe `cellule-fautive` (fond rouge clair) + un `title` explicatif.
+- Le bouton « Exporter en CSV » est désactivé si aucune ligne n'est cochée **ou** si une ligne **cochée** contient une cellule fautive (une ligne fautive non cochée ne bloque pas).
+- `handleExport` : ne sérialise que l'en-tête + les lignes cochées ; via `protegerSeparateur` (encadre chaque `;` interne d'une valeur par le caractère de protection Gescicca, cf. `SEPARATEUR_PROTECTION`), BOM `﻿` en tête, `Blob` téléchargé via un `<a download>` créé à la volée. Nom de fichier : `import_Gescicca_groupe_${sanitizeNomFichier(nomGroupeExport)}.csv` (le libellé du groupe est mémorisé dans un state à l'extraction, plus d'index positionnel).
 
 **`src/gesciccaValidation.js`** — `validerLigne(ligne)` applique les règles de la spec Gescicca v2.4 : champs obligatoires, jeux de valeurs de référence (`TITRE`, `TYPE_FINANCEMENT_INSCRIPTION`, `STATUT_EMPLOI`, `STATUT_INSCRIPTION`, `TYPE_INSCRIPTION`), formats (date, e-mail, `CODE_POSTAL`/INSEE, `ANNEE`), règles de caractères (NOM/PRÉNOM ; ADRESSE avec chiffres ; VILLE sans chiffres), longueurs max, dépendances inter-colonnes (`CODE_POSTAL`↔`PAYS`, `LIEU_NAISSANCE`↔`PAYS_NAISSANCE`), codes `990`/`995` interdits pour `PAYS_NAISSANCE` et `CODE_NATIONALITE`, appartenance des centres aux listes de `gesciccaDefaults.js`. Non couvert (faute de référentiel) : libellés exacts `FORMATION` / `GROUPE_FORMATION`, validité réelle des codes `CODE_NATIONALITE` / `PAYS_NAISSANCE` / `PAYS` (seulement « non vide » / numérique).
 
@@ -88,7 +90,7 @@ Règles de transformation notables :
 - **Incohérence d'encodage** : BOM UTF-8 écrit mais `Blob` typé `charset=cp1252`. À trancher par un test d'import réel.
 - **Aucune erreur remontée à l'UI** en cas d'échec `fetch` (seulement `console.error`).
 
-Déjà traité : nom de fichier via index magique `csvPreview[1][23]` (→ `sanitizeNomFichier(nomGroupeExport)`), échappement du séparateur `;` (→ `protegerSeparateur`), race au chargement des référentiels (→ `referencesRef` + `referencesChargees`), validation des lignes avant export avec surlignage des cellules fautives (→ `src/gesciccaValidation.js`, cf. §3).
+Déjà traité : nom de fichier via index magique `csvPreview[1][23]` (→ `sanitizeNomFichier(nomGroupeExport)`), échappement du séparateur `;` (→ `protegerSeparateur`), race au chargement des référentiels (→ `referencesRef` + `referencesChargees`), validation des lignes avant export avec surlignage des cellules fautives (→ `src/gesciccaValidation.js`, cf. §3), sélection des lignes à exporter (cases à cocher, cf. §3).
 
 ### Priorité 2 — valeurs codées en dur à dériver de la situation contractuelle
 
