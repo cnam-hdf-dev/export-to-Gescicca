@@ -4,6 +4,7 @@ import Papa from "papaparse";
 import {
   DEFAUTS_INSCRIPTION,
   CENTRES_ENSEIGNEMENT,
+  CENTRE_ENSEIGNEMENT_DEFAUT,
   CENTRES_ATTACHEMENT,
   SEPARATEUR,
   SEPARATEUR_PROTECTION,
@@ -69,7 +70,7 @@ export default function ExportApprenants() {
   const [groupes, setGroupes] = useState([]);
   const [selectedGroupe, setSelectedGroupe] = useState("");
   const [nomFormation, setNomFormation] = useState("");
-  const [nomCentreEnseignement, setNomCentreEnseignement] = useState("");
+  const [nomCentreEnseignement, setNomCentreEnseignement] = useState(CENTRE_ENSEIGNEMENT_DEFAUT);
   const [nomCentreAttachement, setNomCentreAttachement] = useState("");
   const [loading, setLoading] = useState(false);
   const [csvPreview, setCsvPreview] = useState([]);

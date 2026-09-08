@@ -23,7 +23,12 @@ export const CENTRES_ENSEIGNEMENT = [
   "Logistique Transport",
   "Gestion Comptabilite Finance",
   "Droit ICH",
+  "Alternance",
+  "HTT",
 ];
+
+// Centre d'enseignement présélectionné dans le sélecteur.
+export const CENTRE_ENSEIGNEMENT_DEFAUT = "Alternance";
 
 export const CENTRES_ATTACHEMENT = ["Amiens", "Lille", "Valenciennes"];
 
