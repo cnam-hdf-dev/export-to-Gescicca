@@ -16,6 +16,40 @@
   margin-bottom: 12px;
 }
 
+.groupe-combobox {
+  position: relative;
+  display: inline-block;
+}
+
+.groupe-combobox-liste {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  width: 316px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: -12px 0 0;
+  padding: 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #ccc;
+}
+
+.groupe-combobox-option {
+  padding: 8px;
+  cursor: pointer;
+}
+
+.groupe-combobox-option.actif {
+  background-color: #eef;
+}
+
+.groupe-combobox-vide {
+  padding: 8px;
+  color: #888;
+}
+
 .export-button {
   padding: 10px 16px;
   margin-top: 10px;

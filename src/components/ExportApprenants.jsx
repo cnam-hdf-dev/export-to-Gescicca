@@ -64,6 +64,17 @@ const sanitizeNomFichier = (val, fallback = "groupe") => {
   return nettoye || fallback;
 };
 
+// Normalise une chaîne pour une recherche insensible à la casse et aux accents.
+const sansAccents = (val) =>
+  String(val ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+// Libellé d'affichage d'un groupe.
+const libelleGroupe = (g) =>
+  g.nomGroupe || g.abregeGroupe || `Groupe ${g.codeGroupe}`;
+
 export default function ExportApprenants() {
   const [groupes, setGroupes] = useState([]);
   const [selectedGroupe, setSelectedGroupe] = useState("");
@@ -75,6 +86,12 @@ export default function ExportApprenants() {
   const [csvPreview, setCsvPreview] = useState([]);
   const [nomGroupeExport, setNomGroupeExport] = useState("");
   const [editingCell, setEditingCell] = useState(null);
+
+  // Combobox de recherche du groupe.
+  const [rechercheGroupe, setRechercheGroupe] = useState("");
+  const [groupeOuvert, setGroupeOuvert] = useState(false);
+  const [indexActifGroupe, setIndexActifGroupe] = useState(0);
+  const comboboxGroupeRef = useRef(null);
 
   // Tables de correspondance Yparéo -> Gescicca, chargées une fois au montage.
   const referencesRef = useRef({ communes: {}, nationalites: {}, pays: {} });
@@ -106,6 +123,55 @@ export default function ExportApprenants() {
 
     fetchData();
   }, []);
+
+  // Ferme la liste du combobox groupe au clic en dehors.
+  useEffect(() => {
+    if (!groupeOuvert) return;
+    const handleClic = (e) => {
+      if (comboboxGroupeRef.current && !comboboxGroupeRef.current.contains(e.target)) {
+        setGroupeOuvert(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClic);
+    return () => document.removeEventListener("mousedown", handleClic);
+  }, [groupeOuvert]);
+
+  const groupeSelectionne = groupes.find(
+    (g) => g.codeGroupe.toString() === selectedGroupe
+  );
+  // Quand le champ affiche exactement le libellé du groupe choisi, on ne filtre
+  // pas : la liste complète reste accessible pour en sélectionner un autre.
+  const rechercheEffective =
+    groupeSelectionne && rechercheGroupe === libelleGroupe(groupeSelectionne)
+      ? ""
+      : rechercheGroupe;
+  const groupesFiltres = groupes.filter((g) =>
+    sansAccents(libelleGroupe(g)).includes(sansAccents(rechercheEffective))
+  );
+
+  const choisirGroupe = (g) => {
+    setSelectedGroupe(g.codeGroupe.toString());
+    setRechercheGroupe(libelleGroupe(g));
+    setGroupeOuvert(false);
+  };
+
+  const handleRechercheGroupeKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setGroupeOuvert(true);
+      setIndexActifGroupe((i) => Math.min(i + 1, groupesFiltres.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setIndexActifGroupe((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (groupeOuvert && groupesFiltres[indexActifGroupe]) {
+        e.preventDefault();
+        choisirGroupe(groupesFiltres[indexActifGroupe]);
+      }
+    } else if (e.key === "Escape") {
+      setGroupeOuvert(false);
+    }
+  };
 
   const handleExtract = async () => {
     const groupeInfo = groupes.find(g => g.codeGroupe.toString() === selectedGroupe);
@@ -321,18 +387,59 @@ export default function ExportApprenants() {
         Exporter les apprenants d'un groupe
       </h2>
 
-      <select
-        onChange={(e) => setSelectedGroupe(e.target.value)}
-        value={selectedGroupe}
-        className="export-select"
-      >
-        <option value="">Sélectionner un groupe</option>
-        {groupes.map((g) => (
-          <option key={g.codeGroupe} value={g.codeGroupe.toString()}>
-            {g.nomGroupe || g.abregeGroupe || `Groupe ${g.codeGroupe}`}
-          </option>
-        ))}
-      </select>
+      <div className="groupe-combobox" ref={comboboxGroupeRef}>
+        <input
+          type="text"
+          className="export-select"
+          placeholder="Rechercher un groupe…"
+          value={rechercheGroupe}
+          role="combobox"
+          aria-expanded={groupeOuvert}
+          aria-controls="groupe-combobox-liste"
+          aria-autocomplete="list"
+          onChange={(e) => {
+            setRechercheGroupe(e.target.value);
+            setSelectedGroupe("");
+            setGroupeOuvert(true);
+            setIndexActifGroupe(0);
+          }}
+          onFocus={(e) => {
+            setGroupeOuvert(true);
+            e.target.select();
+          }}
+          onKeyDown={handleRechercheGroupeKeyDown}
+        />
+        {groupeOuvert && (
+          <ul
+            id="groupe-combobox-liste"
+            className="groupe-combobox-liste"
+            role="listbox"
+          >
+            {groupesFiltres.length === 0 ? (
+              <li className="groupe-combobox-vide">Aucun groupe</li>
+            ) : (
+              groupesFiltres.map((g, i) => (
+                <li
+                  key={g.codeGroupe}
+                  role="option"
+                  aria-selected={g.codeGroupe.toString() === selectedGroupe}
+                  className={
+                    "groupe-combobox-option" +
+                    (i === indexActifGroupe ? " actif" : "")
+                  }
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    choisirGroupe(g);
+                  }}
+                  onMouseEnter={() => setIndexActifGroupe(i)}
+                >
+                  {libelleGroupe(g)}
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
 
       <div>
         <label>Année universitaire : </label><br />
