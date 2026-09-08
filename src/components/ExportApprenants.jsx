@@ -3,6 +3,8 @@ import "./ExportApprenants.css";
 import Papa from "papaparse";
 import {
   DEFAUTS_INSCRIPTION,
+  ANNEES,
+  ANNEE_DEFAUT,
   CENTRES_ENSEIGNEMENT,
   CENTRE_ENSEIGNEMENT_DEFAUT,
   CENTRES_ATTACHEMENT,
@@ -69,6 +71,7 @@ const sanitizeNomFichier = (val, fallback = "groupe") => {
 export default function ExportApprenants() {
   const [groupes, setGroupes] = useState([]);
   const [selectedGroupe, setSelectedGroupe] = useState("");
+  const [annee, setAnnee] = useState(ANNEE_DEFAUT);
   const [nomFormation, setNomFormation] = useState("");
   const [nomCentreEnseignement, setNomCentreEnseignement] = useState(CENTRE_ENSEIGNEMENT_DEFAUT);
   const [nomCentreAttachement, setNomCentreAttachement] = useState("");
@@ -252,7 +255,7 @@ export default function ExportApprenants() {
           // '',// RAISON_SOCIALE_ENTREPRISE
           // '',// SIRET_ENTREPRISE
           // '',// IDENTIFIANT_ENTREPRISE
-          DEFAUTS_INSCRIPTION.ANNEE,// ANNEE
+          annee,// ANNEE
           nomCentreEnseignement,// CENTRE_ENSEIGNEMENT
           nomCentreAttachement,// CENTRE_ATTACHEMENT
           // '',// STATUT_AUDITEUR
@@ -324,6 +327,19 @@ export default function ExportApprenants() {
           </option>
         ))}
       </select>
+
+      <div>
+        <label>Année universitaire : </label><br />
+        <select
+          onChange={(e) => setAnnee(e.target.value)}
+          value={annee}
+          className="export-select"
+        >
+          {ANNEES.map((a) => (
+            <option key={a}>{a}</option>
+          ))}
+        </select>
+      </div>
 
       <div>
         <label>Nom exact de la formation dans Gescicca : </label><br />
