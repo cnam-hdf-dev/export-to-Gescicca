@@ -51,8 +51,10 @@ Les valeurs métier externalisées sont dans **`src/config/gesciccaDefaults.js`*
 
 ### 1. Chargement initial (`useEffect`)
 
-- `GET /api/r/v1/formation-longue/groupes` → alimente le **combobox de recherche du groupe** (input + liste filtrée `groupesFiltres`, filtrage insensible casse/accents via `sansAccents` / `libelleGroupe`, navigation clavier, fermeture au clic extérieur). `selectedGroupe` (code) reste la source de vérité, vidé dès qu'on édite le texte, reposé à la sélection d'une entrée.
-- Chargement en parallèle (`Promise.all`) des 3 CSV de référence de `public/ref/` via `papaparse`, transformés en dictionnaires stockés dans `referencesRef` (`useRef`, donc préservé au Fast Refresh). `referencesChargees` (state) passe à `true` une fois les 3 chargés ; le bouton « Extraire » reste désactivé tant que non chargé.
+- **Année scolaire (période)** : `GET /api/r/v1/periodes` (`wrPeriode[]`) alimente le tout premier sélecteur de la page, trié du plus récent au plus ancien (`dateDeb` décroissante). Valeur par défaut calculée par `periodeCourante` : la période dont `dateDeb <= aujourd'hui <= dateFin`, sinon la plus récente déjà commencée. Chargé en parallèle des 3 CSV de référence (`Promise.all`).
+- `GET /api/r/v1/formation-longue/groupes?codesPeriode={selectedPeriode}` → alimente le **combobox de recherche du groupe** (input + liste filtrée `groupesFiltres`, filtrage insensible casse/accents via `sansAccents` / `libelleGroupe`, navigation clavier, fermeture au clic extérieur). Rechargé (`useEffect([selectedPeriode])`, `groupesCharges`) à chaque changement de période ; `selectedGroupe` (code) reste la source de vérité, vidé dès qu'on édite le texte, reposé à la sélection d'une entrée, et réinitialisé (avec `csvPreview`/`lignesSelectionnees`) par `handleChangerPeriode` quand la période change.
+- Chargement en parallèle (`Promise.all`) des 3 CSV de référence de `public/ref/` via `papaparse`, transformés en dictionnaires stockés dans `referencesRef` (`useRef`, donc préservé au Fast Refresh). `referencesChargees` (state) passe à `true` une fois les 3 chargés ; le bouton « Extraire » reste désactivé tant que `referencesChargees` et `groupesCharges` ne sont pas tous les deux vrais.
+- L'endpoint `groupes/{codeGroupe}/apprenants` (§2) n'a pas de filtre période propre : c'est le filtrage des **groupes** par `codesPeriode` qui détermine, en aval, les apprenants d'une année scolaire donnée.
 
 | Fichier | Clé | Valeur | Usage |
 |---|---|---|---|
@@ -90,7 +92,7 @@ Règles de transformation notables :
 - **Incohérence d'encodage** : BOM UTF-8 écrit mais `Blob` typé `charset=cp1252`. À trancher par un test d'import réel.
 - **Aucune erreur remontée à l'UI** en cas d'échec `fetch` (seulement `console.error`).
 
-Déjà traité : nom de fichier via index magique `csvPreview[1][23]` (→ `sanitizeNomFichier(nomGroupeExport)`), échappement du séparateur `;` (→ `protegerSeparateur`), race au chargement des référentiels (→ `referencesRef` + `referencesChargees`), validation des lignes avant export avec surlignage des cellules fautives (→ `src/gesciccaValidation.js`, cf. §3), sélection des lignes à exporter (cases à cocher, cf. §3).
+Déjà traité : nom de fichier via index magique `csvPreview[1][23]` (→ `sanitizeNomFichier(nomGroupeExport)`), échappement du séparateur `;` (→ `protegerSeparateur`), race au chargement des référentiels (→ `referencesRef` + `referencesChargees`), validation des lignes avant export avec surlignage des cellules fautives (→ `src/gesciccaValidation.js`, cf. §3), sélection des lignes à exporter (cases à cocher, cf. §3), sélection de l'année scolaire (période Yparéo) pour extraire un groupe d'une année antérieure (cf. §1).
 
 ### Priorité 2 — valeurs codées en dur à dériver de la situation contractuelle
 
@@ -119,8 +121,8 @@ Correspondances cibles indicatives : apprentissage → `APP` / `C` / dispositif 
 
 - `GET /r/v1/apprenants/{codeApprenant}/contrats` (`wrContrat[]`, clé basic) : type de contrat, `resilEnCours` / `dateResiliation` (exclure ou basculer « autre »), `codeEntreprise`.
 - `GET /r/v1/entreprises/{codeEntreprise}` → `siret`, `nomEntreprise` → colonnes `SIRET_ENTREPRISE` / `RAISON_SOCIALE_ENTREPRISE` (Gescicca rattache l'auditeur à l'employeur en alternance).
-- Référentiels `GET /r/v1/statuts`, `/annees`, `/periodes`, `/diplomes-prepares` mis en cache comme les CSV `public/ref/`.
-- Filtrer côté API : `formation-longue/groupes?@filtre=codesSite=…&@filtre=codesPeriode=…` (format filtre Yparéo : `?@filtre=X&@filtre=Y`, suffixe `[]` = valeurs multiples séparées par virgules).
+- Référentiels `GET /r/v1/statuts`, `/annees`, `/diplomes-prepares` mis en cache comme les CSV `public/ref/` (`/periodes` est déjà exploité, cf. §1).
+- Filtrer aussi par site : `formation-longue/groupes?codesPeriode=…&codesSite=…` (format filtre Yparéo : `?nomFiltre=valeur`, suffixe `[]` du type = valeurs multiples séparées par virgules).
 
 ### Refactor structurant
 
