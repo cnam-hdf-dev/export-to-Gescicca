@@ -76,8 +76,40 @@ const sansAccents = (val) =>
 const libelleGroupe = (g) =>
   g.nomGroupe || g.abregeGroupe || `Groupe ${g.codeGroupe}`;
 
+// Parse une date Yparéo au format JJ/MM/AAAA.
+const parseDateFr = (s) => {
+  const [jj, mm, aaaa] = String(s ?? "").split("/").map(Number);
+  if (!jj || !mm || !aaaa) return null;
+  return new Date(aaaa, mm - 1, jj);
+};
+
+// Détermine la période scolaire courante : celle qui englobe aujourd'hui,
+// ou à défaut la plus récente déjà commencée.
+const periodeCourante = (listePeriodes) => {
+  const maintenant = new Date();
+  const dansLIntervalle = listePeriodes.find((p) => {
+    const debut = parseDateFr(p.dateDeb);
+    const fin = parseDateFr(p.dateFin);
+    return debut && fin && debut <= maintenant && maintenant <= fin;
+  });
+  if (dansLIntervalle) return dansLIntervalle.codePeriode.toString();
+
+  const dejaCommencees = listePeriodes
+    .filter((p) => {
+      const debut = parseDateFr(p.dateDeb);
+      return debut && debut <= maintenant;
+    })
+    .sort((a, b) => parseDateFr(b.dateDeb) - parseDateFr(a.dateDeb));
+  if (dejaCommencees[0]) return dejaCommencees[0].codePeriode.toString();
+
+  return listePeriodes[0] ? listePeriodes[0].codePeriode.toString() : "";
+};
+
 export default function ExportApprenants() {
+  const [periodes, setPeriodes] = useState([]);
+  const [selectedPeriode, setSelectedPeriode] = useState("");
   const [groupes, setGroupes] = useState([]);
+  const [groupesCharges, setGroupesCharges] = useState(false);
   const [selectedGroupe, setSelectedGroupe] = useState("");
   const [annee, setAnnee] = useState(ANNEE_DEFAUT);
   const [nomFormation, setNomFormation] = useState("");
@@ -103,20 +135,21 @@ export default function ExportApprenants() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const groupesRes = await fetch(`/api/r/v1/formation-longue/groupes`, {
-          headers: { "X-Auth-Token": token },
-        });
-        const groupesData = await groupesRes.json();
-        const liste = Object.values(groupesData).sort((a, b) =>
-          (a.nomGroupe || "").localeCompare(b.nomGroupe || "")
-        );
-        setGroupes(liste);
-
-        const [communes, nationalites, pays] = await Promise.all([
+        const [periodesData, communes, nationalites, pays] = await Promise.all([
+          fetch(`/api/r/v1/periodes`, {
+            headers: { "X-Auth-Token": token },
+          }).then((res) => res.json()),
           loadReferenceCsv("/ref/liste_communes.csv", "CODE_COMMUNE", "NOMENCL_INSEE"),
           loadReferenceCsv("/ref/liste_nationalites.csv", "CODE_NATIONALITE", "ID_BASE_EXTERNE"),
           loadReferenceCsv("/ref/liste_pays.csv", "CODE_PAYS", "ID_BASE_EXTERNE"),
         ]);
+
+        const listePeriodes = Object.values(periodesData).sort(
+          (a, b) => parseDateFr(b.dateDeb) - parseDateFr(a.dateDeb)
+        );
+        setPeriodes(listePeriodes);
+        setSelectedPeriode(periodeCourante(listePeriodes));
+
         referencesRef.current = { communes, nationalites, pays };
         setReferencesChargees(true);
       } catch (err) {
@@ -126,6 +159,39 @@ export default function ExportApprenants() {
 
     fetchData();
   }, []);
+
+  // Recharge les groupes de formation longue à chaque changement de période.
+  useEffect(() => {
+    if (!selectedPeriode) return;
+    const fetchGroupes = async () => {
+      setGroupesCharges(false);
+      try {
+        const res = await fetch(
+          `/api/r/v1/formation-longue/groupes?codesPeriode=${selectedPeriode}`,
+          { headers: { "X-Auth-Token": token } }
+        );
+        const data = await res.json();
+        const liste = Object.values(data).sort((a, b) =>
+          (a.nomGroupe || "").localeCompare(b.nomGroupe || "")
+        );
+        setGroupes(liste);
+      } catch (err) {
+        console.error("Erreur lors du chargement des groupes :", err);
+      } finally {
+        setGroupesCharges(true);
+      }
+    };
+    fetchGroupes();
+  }, [selectedPeriode]);
+
+  const handleChangerPeriode = (e) => {
+    setSelectedPeriode(e.target.value);
+    setSelectedGroupe("");
+    setRechercheGroupe("");
+    setGroupeOuvert(false);
+    setCsvPreview([]);
+    setLignesSelectionnees(new Set());
+  };
 
   // Ferme la liste du combobox groupe au clic en dehors.
   useEffect(() => {
@@ -431,6 +497,21 @@ export default function ExportApprenants() {
         Exporter les apprenants d'un groupe
       </h2>
 
+      <div>
+        <label>Année scolaire : </label><br />
+        <select
+          onChange={handleChangerPeriode}
+          value={selectedPeriode}
+          className="export-select"
+        >
+          {periodes.map((p) => (
+            <option key={p.codePeriode} value={p.codePeriode.toString()}>
+              {p.nomPeriode}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="groupe-combobox" ref={comboboxGroupeRef}>
         <input
           type="text"
@@ -540,12 +621,12 @@ export default function ExportApprenants() {
       
       <button
         onClick={handleExtract}
-        disabled={loading || !selectedGroupe || !referencesChargees}
+        disabled={loading || !selectedGroupe || !referencesChargees || !groupesCharges}
         className="export-button"
       >
         {loading
           ? "Extraction en cours..."
-          : referencesChargees
+          : referencesChargees && groupesCharges
           ? "Extraire"
           : "Chargement des référentiels..."}
       </button>
