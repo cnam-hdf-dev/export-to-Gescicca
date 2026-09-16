@@ -130,6 +130,11 @@
   border-radius: 6px;
 }
 
+.matiere-pastille-desactivee {
+  background-color: #fde2e2;
+  color: #b3261e;
+}
+
 .barre-actions {
   display: flex;
   justify-content: flex-end;

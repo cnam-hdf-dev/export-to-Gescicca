@@ -214,10 +214,9 @@ export default function ExportApprenants() {
   );
 
   // Plan de formation du groupe sélectionné (déjà dans la réponse groupes,
-  // pas d'appel supplémentaire) : matières encore utilisées uniquement.
-  const matieresGroupe = (groupeSelectionne?.matieres || []).filter(
-    (m) => !m.nePlusUtiliser
-  );
+  // pas d'appel supplémentaire) : matières « ne plus utiliser » incluses,
+  // mais mises en évidence différemment à l'affichage (cf. JSX).
+  const matieresGroupe = groupeSelectionne?.matieres || [];
 
   // Récupère l'abrégé de la formation (code diplôme Gescicca) du groupe
   // sélectionné, absent de wrGroupe : un appel dédié à /formations est requis.
@@ -635,7 +634,14 @@ export default function ExportApprenants() {
             <div className="matieres-liste">
               {matieresGroupe.length > 0 ? (
                 matieresGroupe.map((m) => (
-                  <span key={m.codeMatiere} className="matiere-pastille">
+                  <span
+                    key={m.codeMatiere}
+                    className={
+                      "matiere-pastille" +
+                      (m.nePlusUtiliser ? " matiere-pastille-desactivee" : "")
+                    }
+                    title={m.nePlusUtiliser ? "Matière ne plus utiliser" : undefined}
+                  >
                     {m.abregeMatiere}
                   </span>
                 ))
