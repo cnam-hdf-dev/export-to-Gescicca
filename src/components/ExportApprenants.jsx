@@ -297,12 +297,21 @@ export default function ExportApprenants() {
   const nbLignes = Math.max(csvPreview.length - 1, 0);
   const ligneEstFautive = (i) =>
     erreursParLigne[i] && Object.keys(erreursParLigne[i]).length > 0;
-  const toutSelectionne = nbLignes > 0 && lignesSelectionnees.size === nbLignes;
+  // Lignes sélectionnables : une ligne fautive ne peut pas être cochée
+  // (case désactivée, cf. rendu) tant que ses cellules en rouge ne sont
+  // pas corrigées.
+  const indicesSelectionnables = Array.from({ length: nbLignes }, (_, i) => i).filter(
+    (i) => !ligneEstFautive(i)
+  );
+  const toutSelectionne =
+    indicesSelectionnables.length > 0 &&
+    indicesSelectionnables.every((i) => lignesSelectionnees.has(i));
   const selectionPartielle =
     lignesSelectionnees.size > 0 && !toutSelectionne;
   const selectionContientErreur = [...lignesSelectionnees].some(ligneEstFautive);
 
   const basculerLigne = (i) => {
+    if (ligneEstFautive(i)) return;
     setLignesSelectionnees((prev) => {
       const suivant = new Set(prev);
       if (suivant.has(i)) suivant.delete(i);
@@ -313,7 +322,7 @@ export default function ExportApprenants() {
 
   const basculerToutes = () => {
     setLignesSelectionnees(
-      toutSelectionne ? new Set() : new Set(Array.from({ length: nbLignes }, (_, i) => i))
+      toutSelectionne ? new Set() : new Set(indicesSelectionnables)
     );
   };
 
@@ -717,6 +726,7 @@ export default function ExportApprenants() {
                 <input
                   type="checkbox"
                   checked={toutSelectionne}
+                  disabled={indicesSelectionnables.length === 0}
                   ref={(el) => {
                     if (el) el.indeterminate = selectionPartielle;
                   }}
@@ -739,8 +749,14 @@ export default function ExportApprenants() {
                   <input
                     type="checkbox"
                     checked={lignesSelectionnees.has(i)}
+                    disabled={ligneEstFautive(i)}
                     onChange={() => basculerLigne(i)}
                     aria-label={`Sélectionner la ligne ${i + 1}`}
+                    title={
+                      ligneEstFautive(i)
+                        ? "Corrigez les cellules en rouge avant de sélectionner cette ligne"
+                        : undefined
+                    }
                   />
                 </td>
                 {row.map((cell, j) => {
