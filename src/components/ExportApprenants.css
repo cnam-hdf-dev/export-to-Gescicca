@@ -1,5 +1,5 @@
 .export-container {
-  max-width: 960px;
+  max-width: min(1400px, 96vw);
   margin: 0 auto;
   padding: 20px;
 }
@@ -16,6 +16,10 @@
   border-radius: 12px;
   padding: 16px 20px;
   margin-bottom: 16px;
+}
+
+.export-card:not(.apercu-card) {
+  max-width: 760px;
 }
 
 .export-card-titre {
@@ -168,15 +172,16 @@
 .preview-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .preview-table th,
 .preview-table td {
   border: 1px solid #eee;
   border-bottom: 1px solid #eee;
-  padding: 8px 10px;
+  padding: 6px 8px;
   text-align: left;
+  white-space: nowrap;
 }
 
 .preview-table th {
