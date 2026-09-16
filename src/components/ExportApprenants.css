@@ -50,6 +50,19 @@
   color: #888;
 }
 
+.formation-info {
+  margin: 4px 0 16px;
+  padding: 8px 10px;
+  background-color: #f5f5f5;
+  font-size: 13px;
+  color: #333;
+  max-width: 600px;
+}
+
+.formation-info p {
+  margin: 2px 0;
+}
+
 .preview-table td.cellule-fautive {
   background-color: #fde2e2;
 }

@@ -128,6 +128,10 @@ export default function ExportApprenants() {
   const [indexActifGroupe, setIndexActifGroupe] = useState(0);
   const comboboxGroupeRef = useRef(null);
 
+  // Informations formation du groupe sélectionné (purement informatif, hors CSV).
+  const [formationInfo, setFormationInfo] = useState(null);
+  const [formationChargee, setFormationChargee] = useState(false);
+
   // Tables de correspondance Yparéo -> Gescicca, chargées une fois au montage.
   const referencesRef = useRef({ communes: {}, nationalites: {}, pays: {} });
   const [referencesChargees, setReferencesChargees] = useState(false);
@@ -208,6 +212,41 @@ export default function ExportApprenants() {
   const groupeSelectionne = groupes.find(
     (g) => g.codeGroupe.toString() === selectedGroupe
   );
+
+  // Plan de formation du groupe sélectionné (déjà dans la réponse groupes,
+  // pas d'appel supplémentaire) : matières encore utilisées uniquement.
+  const matieresGroupe = (groupeSelectionne?.matieres || []).filter(
+    (m) => !m.nePlusUtiliser
+  );
+
+  // Récupère l'abrégé de la formation (code diplôme Gescicca) du groupe
+  // sélectionné, absent de wrGroupe : un appel dédié à /formations est requis.
+  useEffect(() => {
+    if (!groupeSelectionne) {
+      setFormationInfo(null);
+      setFormationChargee(false);
+      return;
+    }
+    let annule = false;
+    setFormationChargee(false);
+    fetch(`/api/r/v1/formations/${groupeSelectionne.codeFormation}`, {
+      headers: { "X-Auth-Token": token },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!annule) setFormationInfo(data);
+      })
+      .catch((err) => {
+        console.error("Erreur lors du chargement de la formation :", err);
+        if (!annule) setFormationInfo(null);
+      })
+      .finally(() => {
+        if (!annule) setFormationChargee(true);
+      });
+    return () => {
+      annule = true;
+    };
+  }, [groupeSelectionne]);
   // Quand le champ affiche exactement le libellé du groupe choisi, on ne filtre
   // pas : la liste complète reste accessible pour en sélectionner un autre.
   const rechercheEffective =
@@ -565,6 +604,23 @@ export default function ExportApprenants() {
           </ul>
         )}
       </div>
+
+      {groupeSelectionne && (
+        <div className="formation-info">
+          <p>
+            <strong>Diplôme (code Gescicca) : </strong>
+            {formationChargee
+              ? formationInfo?.abregeFormation || "Non renseigné"
+              : "Chargement…"}
+          </p>
+          <p>
+            <strong>Plan de formation du groupe : </strong>
+            {matieresGroupe.length > 0
+              ? matieresGroupe.map((m) => m.abregeMatiere).join(", ")
+              : "Aucune matière"}
+          </p>
+        </div>
+      )}
 
       <div>
         <label>Année universitaire : </label><br />
