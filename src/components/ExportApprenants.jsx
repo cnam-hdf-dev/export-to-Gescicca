@@ -536,159 +536,180 @@ export default function ExportApprenants() {
         Exporter les apprenants d'un groupe
       </h2>
 
-      <div>
-        <label>Année scolaire : </label><br />
-        <select
-          onChange={handleChangerPeriode}
-          value={selectedPeriode}
-          className="export-select"
-        >
-          {periodes.map((p) => (
-            <option key={p.codePeriode} value={p.codePeriode.toString()}>
-              {p.nomPeriode}
-            </option>
-          ))}
-        </select>
-      </div>
+      <section className="export-card">
+        <h3 className="export-card-titre">Sélection</h3>
+        <div className="champ-grid">
+          <div className="champ">
+            <label>Année scolaire</label>
+            <select
+              onChange={handleChangerPeriode}
+              value={selectedPeriode}
+              className="export-select"
+            >
+              {periodes.map((p) => (
+                <option key={p.codePeriode} value={p.codePeriode.toString()}>
+                  {p.nomPeriode}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      <div className="groupe-combobox" ref={comboboxGroupeRef}>
-        <input
-          type="text"
-          className="export-select"
-          placeholder="Rechercher un groupe…"
-          value={rechercheGroupe}
-          role="combobox"
-          aria-expanded={groupeOuvert}
-          aria-controls="groupe-combobox-liste"
-          aria-autocomplete="list"
-          onChange={(e) => {
-            setRechercheGroupe(e.target.value);
-            setSelectedGroupe("");
-            setGroupeOuvert(true);
-            setIndexActifGroupe(0);
-          }}
-          onFocus={(e) => {
-            setGroupeOuvert(true);
-            e.target.select();
-          }}
-          onKeyDown={handleRechercheGroupeKeyDown}
-        />
-        {groupeOuvert && (
-          <ul
-            id="groupe-combobox-liste"
-            className="groupe-combobox-liste"
-            role="listbox"
-          >
-            {groupesFiltres.length === 0 ? (
-              <li className="groupe-combobox-vide">Aucun groupe</li>
-            ) : (
-              groupesFiltres.map((g, i) => (
-                <li
-                  key={g.codeGroupe}
-                  role="option"
-                  aria-selected={g.codeGroupe.toString() === selectedGroupe}
-                  className={
-                    "groupe-combobox-option" +
-                    (i === indexActifGroupe ? " actif" : "")
-                  }
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    choisirGroupe(g);
-                  }}
-                  onMouseEnter={() => setIndexActifGroupe(i)}
-                >
-                  {libelleGroupe(g)}
-                </li>
-              ))
+          <div className="champ groupe-combobox" ref={comboboxGroupeRef}>
+            <label>Groupe de formation</label>
+            <input
+              type="text"
+              className="export-select"
+              placeholder="Rechercher un groupe…"
+              value={rechercheGroupe}
+              role="combobox"
+              aria-expanded={groupeOuvert}
+              aria-controls="groupe-combobox-liste"
+              aria-autocomplete="list"
+              onChange={(e) => {
+                setRechercheGroupe(e.target.value);
+                setSelectedGroupe("");
+                setGroupeOuvert(true);
+                setIndexActifGroupe(0);
+              }}
+              onFocus={(e) => {
+                setGroupeOuvert(true);
+                e.target.select();
+              }}
+              onKeyDown={handleRechercheGroupeKeyDown}
+            />
+            {groupeOuvert && (
+              <ul
+                id="groupe-combobox-liste"
+                className="groupe-combobox-liste"
+                role="listbox"
+              >
+                {groupesFiltres.length === 0 ? (
+                  <li className="groupe-combobox-vide">Aucun groupe</li>
+                ) : (
+                  groupesFiltres.map((g, i) => (
+                    <li
+                      key={g.codeGroupe}
+                      role="option"
+                      aria-selected={g.codeGroupe.toString() === selectedGroupe}
+                      className={
+                        "groupe-combobox-option" +
+                        (i === indexActifGroupe ? " actif" : "")
+                      }
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        choisirGroupe(g);
+                      }}
+                      onMouseEnter={() => setIndexActifGroupe(i)}
+                    >
+                      {libelleGroupe(g)}
+                    </li>
+                  ))
+                )}
+              </ul>
             )}
-          </ul>
-        )}
-      </div>
-
-      {groupeSelectionne && (
-        <div className="formation-info">
-          <p>
-            <strong>Diplôme (code Gescicca) : </strong>
-            {formationChargee
-              ? formationInfo?.abregeFormation || "Non renseigné"
-              : "Chargement…"}
-          </p>
-          <p>
-            <strong>Plan de formation du groupe : </strong>
-            {matieresGroupe.length > 0
-              ? matieresGroupe.map((m) => m.abregeMatiere).join(", ")
-              : "Aucune matière"}
-          </p>
+          </div>
         </div>
-      )}
 
-      <div>
-        <label>Année universitaire : </label><br />
-        <select
-          onChange={(e) => setAnnee(e.target.value)}
-          value={annee}
-          className="export-select"
+        {groupeSelectionne && (
+          <div className="formation-info">
+            <p>
+              <span className="formation-info-label">Diplôme</span>
+              <span className="formation-info-valeur">
+                {formationChargee
+                  ? formationInfo?.abregeFormation || "Non renseigné"
+                  : "Chargement…"}
+              </span>
+            </p>
+            <p className="formation-info-label formation-info-sous-titre">
+              Plan de formation du groupe
+            </p>
+            <div className="matieres-liste">
+              {matieresGroupe.length > 0 ? (
+                matieresGroupe.map((m) => (
+                  <span key={m.codeMatiere} className="matiere-pastille">
+                    {m.abregeMatiere}
+                  </span>
+                ))
+              ) : (
+                <span className="formation-info-valeur">Aucune matière</span>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="export-card">
+        <h3 className="export-card-titre">Paramètres d'export</h3>
+        <div className="champ-grid">
+          <div className="champ">
+            <label>Année universitaire</label>
+            <select
+              onChange={(e) => setAnnee(e.target.value)}
+              value={annee}
+              className="export-select"
+            >
+              {ANNEES.map((a) => (
+                <option key={a}>{a}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="champ">
+            <label>Nom exact de la formation dans Gescicca</label>
+            <input
+              type="text"
+              value={nomFormation}
+              onChange={(e) => setNomFormation(e.target.value)}
+              className="export-input"
+            />
+          </div>
+
+          <div className="champ">
+            <label>Centre d'enseignement</label>
+            <select
+              onChange={(e) => setNomCentreEnseignement(e.target.value)}
+              value={nomCentreEnseignement}
+              className="export-select"
+            >
+              <option value="">Sélectionner un centre d'enseignement</option>
+              {CENTRES_ENSEIGNEMENT.map((centre) => (
+                <option key={centre}>{centre}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="champ">
+            <label>Centre d'attachement</label>
+            <select
+              onChange={(e) => setNomCentreAttachement(e.target.value)}
+              value={nomCentreAttachement}
+              className="export-select"
+            >
+              <option value="">Sélectionner un centre d'attachement</option>
+              {CENTRES_ATTACHEMENT.map((centre) => (
+                <option key={centre}>{centre}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <div className="barre-actions">
+        <button
+          onClick={handleExtract}
+          disabled={loading || !selectedGroupe || !referencesChargees || !groupesCharges}
+          className="export-button"
         >
-          {ANNEES.map((a) => (
-            <option key={a}>{a}</option>
-          ))}
-        </select>
+          {loading
+            ? "Extraction en cours..."
+            : referencesChargees && groupesCharges
+            ? "Extraire"
+            : "Chargement des référentiels..."}
+        </button>
       </div>
 
-      <div>
-        <label>Nom exact de la formation dans Gescicca : </label><br />
-        <input
-          type="text"
-          value={nomFormation}
-          onChange={(e) => setNomFormation(e.target.value)}
-          className="export-input"
-        />
-      </div>
-
-      <br />
-
-      <div>
-        <label>Centre d'enseignement : </label><br />
-        <select
-          onChange={(e) => setNomCentreEnseignement(e.target.value)}
-          value={nomCentreEnseignement}
-          className="export-select"
-        >
-          <option value="">Sélectionner un centre d'enseignement</option>
-          {CENTRES_ENSEIGNEMENT.map((centre) => (
-            <option key={centre}>{centre}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label>Centre d'attachement : </label><br />
-        <select
-          onChange={(e) => setNomCentreAttachement(e.target.value)}
-          value={nomCentreAttachement}
-          className="export-select"
-        >
-          <option value="">Sélectionner un centre d'attachement</option>
-          {CENTRES_ATTACHEMENT.map((centre) => (
-            <option key={centre}>{centre}</option>
-          ))}
-        </select>
-      </div>      
-      
-      <button
-        onClick={handleExtract}
-        disabled={loading || !selectedGroupe || !referencesChargees || !groupesCharges}
-        className="export-button"
-      >
-        {loading
-          ? "Extraction en cours..."
-          : referencesChargees && groupesCharges
-          ? "Extraire"
-          : "Chargement des référentiels..."}
-      </button>
-      
-      <div>
       {csvPreview.length > 1 && (
+        <section className="export-card apercu-card">
         <table className="preview-table">
           <thead>
             <tr>
@@ -764,30 +785,32 @@ export default function ExportApprenants() {
             </tr>
           </tbody>
         </table>
+        </section>
       )}
-      </div>
 
-      <button
-        onClick={handleExport}
-        disabled={
-          csvPreview.length <= 1 ||
-          lignesSelectionnees.size === 0 ||
-          selectionContientErreur
-        }
-        className="export-button"
-      >
-        {loading ? "Export en cours..." : "Exporter en CSV"}
-      </button>
-      {csvPreview.length > 1 && lignesSelectionnees.size === 0 && (
-        <p className="export-erreur">
-          Sélectionnez au moins une ligne à exporter.
-        </p>
-      )}
-      {selectionContientErreur && (
-        <p className="export-erreur">
-          Une ligne sélectionnée contient des cellules à corriger (en rouge).
-        </p>
-      )}
+      <div className="barre-actions barre-actions-fin">
+        {csvPreview.length > 1 && lignesSelectionnees.size === 0 && (
+          <p className="export-erreur">
+            Sélectionnez au moins une ligne à exporter.
+          </p>
+        )}
+        {selectionContientErreur && (
+          <p className="export-erreur">
+            Une ligne sélectionnée contient des cellules à corriger (en rouge).
+          </p>
+        )}
+        <button
+          onClick={handleExport}
+          disabled={
+            csvPreview.length <= 1 ||
+            lignesSelectionnees.size === 0 ||
+            selectionContientErreur
+          }
+          className="export-button"
+        >
+          {loading ? "Export en cours..." : "Exporter en CSV"}
+        </button>
+      </div>
     </div>
   );
 }
