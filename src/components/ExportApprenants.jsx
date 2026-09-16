@@ -215,8 +215,11 @@ export default function ExportApprenants() {
 
   // Plan de formation du groupe sélectionné (déjà dans la réponse groupes,
   // pas d'appel supplémentaire) : matières « ne plus utiliser » incluses,
-  // mais mises en évidence différemment à l'affichage (cf. JSX).
-  const matieresGroupe = groupeSelectionne?.matieres || [];
+  // mais mises en évidence différemment à l'affichage (cf. JSX), triées par
+  // abrégé pour l'affichage.
+  const matieresGroupe = [...(groupeSelectionne?.matieres || [])].sort((a, b) =>
+    (a.abregeMatiere || "").localeCompare(b.abregeMatiere || "")
+  );
 
   // Récupère l'abrégé de la formation (code diplôme Gescicca) du groupe
   // sélectionné, absent de wrGroupe : un appel dédié à /formations est requis.
