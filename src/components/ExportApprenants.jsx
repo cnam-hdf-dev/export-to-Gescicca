@@ -77,6 +77,12 @@ const sansAccents = (val) =>
 const libelleGroupe = (g) =>
   g.nomGroupe || g.abregeGroupe || `Groupe ${g.codeGroupe}`;
 
+// Plan de formation d'un groupe (matières triées par abrégé pour l'affichage).
+const matieresTriees = (g) =>
+  [...(g.matieres || [])].sort((a, b) =>
+    (a.abregeMatiere || "").localeCompare(b.abregeMatiere || "")
+  );
+
 // Parse une date Yparéo au format JJ/MM/AAAA.
 const parseDateFr = (s) => {
   const [jj, mm, aaaa] = String(s ?? "").split("/").map(Number);
@@ -111,14 +117,21 @@ export default function ExportApprenants() {
   const [selectedPeriode, setSelectedPeriode] = useState("");
   const [groupes, setGroupes] = useState([]);
   const [groupesCharges, setGroupesCharges] = useState(false);
-  const [selectedGroupe, setSelectedGroupe] = useState("");
+  // Codes (string) des groupes sélectionnés, dans l'ordre de sélection.
+  const [groupesSelectionnes, setGroupesSelectionnes] = useState([]);
+  // Nom exact de la formation dans Gescicca, par code de groupe.
+  const [nomsFormation, setNomsFormation] = useState({});
   const [annee, setAnnee] = useState(ANNEE_DEFAUT);
-  const [nomFormation, setNomFormation] = useState("");
   const [nomCentreEnseignement, setNomCentreEnseignement] = useState(CENTRE_ENSEIGNEMENT_DEFAUT);
   const [nomCentreAttachement, setNomCentreAttachement] = useState("");
   const [loading, setLoading] = useState(false);
   const [csvPreview, setCsvPreview] = useState([]);
-  const [nomGroupeExport, setNomGroupeExport] = useState("");
+  // Fragment de nom de fichier (« groupe_X » ou « N_groupes ») fixé à l'extraction.
+  const [libelleExport, setLibelleExport] = useState("");
+  // Groupes dont l'extraction a échoué (libellés), signalés sous le bouton Extraire.
+  const [groupesEnEchec, setGroupesEnEchec] = useState([]);
+  // Indices (dans csvPreview.slice(1)) des lignes qui ouvrent un nouveau groupe.
+  const [debutsGroupe, setDebutsGroupe] = useState(() => new Set());
   const [editingCell, setEditingCell] = useState(null);
   const [exportErreursEnCours, setExportErreursEnCours] = useState(false);
   // Indices (0-based dans csvPreview.slice(1)) des lignes cochées pour l'export.
@@ -130,9 +143,10 @@ export default function ExportApprenants() {
   const [indexActifGroupe, setIndexActifGroupe] = useState(0);
   const comboboxGroupeRef = useRef(null);
 
-  // Informations formation du groupe sélectionné (purement informatif, hors CSV).
-  const [formationInfo, setFormationInfo] = useState(null);
-  const [formationChargee, setFormationChargee] = useState(false);
+  // Infos formation par codeFormation (purement informatif, hors CSV) :
+  // { statut: "chargement" | "ok" | "erreur", abregeFormation }.
+  const [formationsInfo, setFormationsInfo] = useState({});
+  const formationsDemandeesRef = useRef(new Set());
 
   // Tables de correspondance Yparéo -> Gescicca, chargées une fois au montage.
   const referencesRef = useRef({ communes: {}, nationalites: {}, pays: {} });
@@ -192,10 +206,11 @@ export default function ExportApprenants() {
 
   const handleChangerPeriode = (e) => {
     setSelectedPeriode(e.target.value);
-    setSelectedGroupe("");
+    setGroupesSelectionnes([]);
     setRechercheGroupe("");
     setGroupeOuvert(false);
     setCsvPreview([]);
+    setGroupesEnEchec([]);
     setLignesSelectionnees(new Set());
   };
 
@@ -211,60 +226,68 @@ export default function ExportApprenants() {
     return () => document.removeEventListener("mousedown", handleClic);
   }, [groupeOuvert]);
 
-  const groupeSelectionne = groupes.find(
-    (g) => g.codeGroupe.toString() === selectedGroupe
-  );
+  // Groupes sélectionnés (objets wrGroupe), dans l'ordre de sélection.
+  const groupesSelectionnesObjets = groupesSelectionnes
+    .map((code) => groupes.find((g) => g.codeGroupe.toString() === code))
+    .filter(Boolean);
 
-  // Plan de formation du groupe sélectionné (déjà dans la réponse groupes,
-  // pas d'appel supplémentaire) : matières « ne plus utiliser » incluses,
-  // mais mises en évidence différemment à l'affichage (cf. JSX), triées par
-  // abrégé pour l'affichage.
-  const matieresGroupe = [...(groupeSelectionne?.matieres || [])].sort((a, b) =>
-    (a.abregeMatiere || "").localeCompare(b.abregeMatiere || "")
-  );
-
-  // Récupère l'abrégé de la formation (code diplôme Gescicca) du groupe
-  // sélectionné, absent de wrGroupe : un appel dédié à /formations est requis.
+  // Récupère l'abrégé de formation (code diplôme Gescicca) de chaque groupe
+  // sélectionné, absent de wrGroupe : un appel dédié à /formations par
+  // codeFormation, une seule fois (cache par code).
   useEffect(() => {
-    if (!groupeSelectionne) {
-      setFormationInfo(null);
-      setFormationChargee(false);
-      return;
-    }
-    let annule = false;
-    setFormationChargee(false);
-    fetch(`/api/r/v1/formations/${groupeSelectionne.codeFormation}`, {
-      headers: { "X-Auth-Token": token },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (!annule) setFormationInfo(data);
+    groupesSelectionnes.forEach((code) => {
+      const groupe = groupes.find((g) => g.codeGroupe.toString() === code);
+      if (!groupe) return;
+      const codeFormation = groupe.codeFormation;
+      if (formationsDemandeesRef.current.has(codeFormation)) return;
+      formationsDemandeesRef.current.add(codeFormation);
+      setFormationsInfo((prev) => ({ ...prev, [codeFormation]: { statut: "chargement" } }));
+      fetch(`/api/r/v1/formations/${codeFormation}`, {
+        headers: { "X-Auth-Token": token },
       })
-      .catch((err) => {
-        console.error("Erreur lors du chargement de la formation :", err);
-        if (!annule) setFormationInfo(null);
-      })
-      .finally(() => {
-        if (!annule) setFormationChargee(true);
-      });
-    return () => {
-      annule = true;
-    };
-  }, [groupeSelectionne]);
-  // Quand le champ affiche exactement le libellé du groupe choisi, on ne filtre
-  // pas : la liste complète reste accessible pour en sélectionner un autre.
-  const rechercheEffective =
-    groupeSelectionne && rechercheGroupe === libelleGroupe(groupeSelectionne)
-      ? ""
-      : rechercheGroupe;
-  const groupesFiltres = groupes.filter((g) =>
-    sansAccents(libelleGroupe(g)).includes(sansAccents(rechercheEffective))
-  );
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((data) => {
+          setFormationsInfo((prev) => ({
+            ...prev,
+            [codeFormation]: { statut: "ok", abregeFormation: data.abregeFormation },
+          }));
+        })
+        .catch((err) => {
+          console.error("Erreur lors du chargement de la formation :", err);
+          setFormationsInfo((prev) => ({ ...prev, [codeFormation]: { statut: "erreur" } }));
+        });
+    });
+  }, [groupesSelectionnes, groupes]);
 
-  const choisirGroupe = (g) => {
-    setSelectedGroupe(g.codeGroupe.toString());
-    setRechercheGroupe(libelleGroupe(g));
-    setGroupeOuvert(false);
+  const groupesFiltres = groupes.filter((g) =>
+    sansAccents(libelleGroupe(g)).includes(sansAccents(rechercheGroupe))
+  );
+  const estSelectionne = (g) => groupesSelectionnes.includes(g.codeGroupe.toString());
+  const tousFiltresSelectionnes =
+    groupesFiltres.length > 0 && groupesFiltres.every(estSelectionne);
+
+  const basculerGroupe = (g) => {
+    const code = g.codeGroupe.toString();
+    setGroupesSelectionnes((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  };
+
+  const retirerGroupe = (code) => {
+    setGroupesSelectionnes((prev) => prev.filter((c) => c !== code));
+  };
+
+  // Ajoute (ou retire, si tous déjà cochés) l'ensemble des résultats filtrés.
+  const basculerTousFiltres = () => {
+    const codes = groupesFiltres.map((g) => g.codeGroupe.toString());
+    setGroupesSelectionnes((prev) =>
+      tousFiltresSelectionnes
+        ? prev.filter((c) => !codes.includes(c))
+        : [...prev, ...codes.filter((c) => !prev.includes(c))]
+    );
   };
 
   const handleRechercheGroupeKeyDown = (e) => {
@@ -278,7 +301,7 @@ export default function ExportApprenants() {
     } else if (e.key === "Enter") {
       if (groupeOuvert && groupesFiltres[indexActifGroupe]) {
         e.preventDefault();
-        choisirGroupe(groupesFiltres[indexActifGroupe]);
+        basculerGroupe(groupesFiltres[indexActifGroupe]);
       }
     } else if (e.key === "Escape") {
       setGroupeOuvert(false);
@@ -332,18 +355,41 @@ export default function ExportApprenants() {
   };
 
   const handleExtract = async () => {
-    const groupeInfo = groupes.find(g => g.codeGroupe.toString() === selectedGroupe);
-    const nomGroupe = groupeInfo?.nomGroupe || '';
-
-    if (!selectedGroupe) return;
+    if (groupesSelectionnesObjets.length === 0) return;
     setLoading(true);
+    setGroupesEnEchec([]);
     try {
-      const apprenantsRaw = await fetch(`/api/r/v1/groupes/${selectedGroupe}/apprenants`, {
-        headers: {
-          "X-Auth-Token": token,
-        },
-      }).then(res => res.json());
-      const apprenants = Object.values(apprenantsRaw);
+      // Un appel par groupe, en parallèle ; l'échec d'un groupe n'empêche pas
+      // l'affichage des autres.
+      const resultats = await Promise.allSettled(
+        groupesSelectionnesObjets.map(async (g) => {
+          const res = await fetch(`/api/r/v1/groupes/${g.codeGroupe}/apprenants`, {
+            headers: { "X-Auth-Token": token },
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return Object.values(await res.json());
+        })
+      );
+
+      // Lignes source, regroupées par groupe (ordre de sélection).
+      const lignesSource = [];
+      const groupesReussis = [];
+      const echecs = [];
+      resultats.forEach((resultat, k) => {
+        const g = groupesSelectionnesObjets[k];
+        if (resultat.status === "rejected") {
+          console.error(`Erreur extraction du groupe ${libelleGroupe(g)} :`, resultat.reason);
+          echecs.push(libelleGroupe(g));
+          return;
+        }
+        groupesReussis.push(g);
+        const nomGroupe = g.nomGroupe || "";
+        const nomFormation = nomsFormation[g.codeGroupe.toString()] || "";
+        resultat.value.forEach((d) =>
+          lignesSource.push({ d, nomGroupe, nomFormation, codeGroupe: g.codeGroupe })
+        );
+      });
+      const codesGroupeLignes = [];
 
       const csvRows = [
         [
@@ -431,7 +477,7 @@ export default function ExportApprenants() {
 
       const { communes, nationalites, pays } = referencesRef.current;
 
-      apprenants.forEach((d) => {
+      lignesSource.forEach(({ d, nomGroupe, nomFormation, codeGroupe }) => {
         const codeInscriptionEnCours = d.informationsCourantes?.codeInscription;
 
         const inscriptionEnCours = d.inscriptions?.find(i => i.codeInscription === codeInscriptionEnCours);
@@ -515,9 +561,22 @@ export default function ExportApprenants() {
           // '',// NOTE_SESSION_2
           // '',// DATE_INSCRIPTION
         ]);
+        codesGroupeLignes.push(codeGroupe);
       });
+
+      const debuts = new Set();
+      codesGroupeLignes.forEach((code, i) => {
+        if (i > 0 && code !== codesGroupeLignes[i - 1]) debuts.add(i);
+      });
+
       setCsvPreview(csvRows);
-      setNomGroupeExport(nomGroupe || selectedGroupe);
+      setDebutsGroupe(debuts);
+      setGroupesEnEchec(echecs);
+      setLibelleExport(
+        groupesReussis.length === 1
+          ? `groupe_${sanitizeNomFichier(groupesReussis[0].nomGroupe || groupesReussis[0].codeGroupe)}`
+          : `${groupesReussis.length}_groupes`
+      );
       setLignesSelectionnees(new Set());
     } catch (err) {
       console.error("Erreur export:", err);
@@ -537,7 +596,7 @@ export default function ExportApprenants() {
     link.href = url;
     link.setAttribute(
       "download",
-      `import_Gescicca_groupe_${sanitizeNomFichier(nomGroupeExport)}.csv`
+      `import_Gescicca_${libelleExport}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -562,7 +621,7 @@ export default function ExportApprenants() {
       link.href = url;
       link.setAttribute(
         "download",
-        `erreurs_Gescicca_groupe_${sanitizeNomFichier(nomGroupeExport)}.xlsx`
+        `erreurs_Gescicca_${libelleExport}.xlsx`
       );
       document.body.appendChild(link);
       link.click();
@@ -578,7 +637,7 @@ export default function ExportApprenants() {
   return (
     <div className="export-container">
       <h2 className="export-title">
-        Exporter les apprenants d'un groupe
+        Exporter les apprenants de groupes de formation
       </h2>
 
       <section className="export-card">
@@ -600,11 +659,11 @@ export default function ExportApprenants() {
           </div>
 
           <div className="champ groupe-combobox" ref={comboboxGroupeRef}>
-            <label>Groupe de formation</label>
+            <label>Groupes de formation</label>
             <input
               type="text"
               className="export-select"
-              placeholder="Rechercher un groupe…"
+              placeholder="Rechercher un ou plusieurs groupes…"
               value={rechercheGroupe}
               role="combobox"
               aria-expanded={groupeOuvert}
@@ -612,7 +671,6 @@ export default function ExportApprenants() {
               aria-autocomplete="list"
               onChange={(e) => {
                 setRechercheGroupe(e.target.value);
-                setSelectedGroupe("");
                 setGroupeOuvert(true);
                 setIndexActifGroupe(0);
               }}
@@ -623,69 +681,139 @@ export default function ExportApprenants() {
               onKeyDown={handleRechercheGroupeKeyDown}
             />
             {groupeOuvert && (
-              <ul
-                id="groupe-combobox-liste"
-                className="groupe-combobox-liste"
-                role="listbox"
-              >
-                {groupesFiltres.length === 0 ? (
-                  <li className="groupe-combobox-vide">Aucun groupe</li>
-                ) : (
-                  groupesFiltres.map((g, i) => (
-                    <li
-                      key={g.codeGroupe}
-                      role="option"
-                      aria-selected={g.codeGroupe.toString() === selectedGroupe}
-                      className={
-                        "groupe-combobox-option" +
-                        (i === indexActifGroupe ? " actif" : "")
-                      }
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        choisirGroupe(g);
-                      }}
-                      onMouseEnter={() => setIndexActifGroupe(i)}
-                    >
-                      {libelleGroupe(g)}
-                    </li>
-                  ))
+              <div className="groupe-combobox-panneau">
+                {rechercheGroupe.trim() !== "" && groupesFiltres.length > 0 && (
+                  <button
+                    type="button"
+                    className="groupe-combobox-action"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      basculerTousFiltres();
+                    }}
+                  >
+                    {tousFiltresSelectionnes
+                      ? `Désélectionner les ${groupesFiltres.length} résultats`
+                      : `Sélectionner les ${groupesFiltres.length} résultats`}
+                  </button>
                 )}
-              </ul>
+                <ul
+                  id="groupe-combobox-liste"
+                  className="groupe-combobox-liste"
+                  role="listbox"
+                  aria-multiselectable="true"
+                >
+                  {groupesFiltres.length === 0 ? (
+                    <li className="groupe-combobox-vide">Aucun groupe</li>
+                  ) : (
+                    groupesFiltres.map((g, i) => (
+                      <li
+                        key={g.codeGroupe}
+                        role="option"
+                        aria-selected={estSelectionne(g)}
+                        className={
+                          "groupe-combobox-option" +
+                          (i === indexActifGroupe ? " actif" : "")
+                        }
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          basculerGroupe(g);
+                        }}
+                        onMouseEnter={() => setIndexActifGroupe(i)}
+                      >
+                        <span
+                          className={
+                            "groupe-case" + (estSelectionne(g) ? " groupe-case-cochee" : "")
+                          }
+                          aria-hidden="true"
+                        >
+                          {estSelectionne(g) ? "✓" : ""}
+                        </span>
+                        {libelleGroupe(g)}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
             )}
           </div>
         </div>
 
-        {groupeSelectionne && (
-          <div className="formation-info">
-            <p>
-              <span className="formation-info-label">Diplôme</span>
-              <span className="formation-info-valeur">
-                {formationChargee
-                  ? formationInfo?.abregeFormation || "Non renseigné"
-                  : "Chargement…"}
-              </span>
-            </p>
-            <p className="formation-info-label formation-info-sous-titre">
-              Plan de formation du groupe
-            </p>
-            <div className="matieres-liste">
-              {matieresGroupe.length > 0 ? (
-                matieresGroupe.map((m) => (
-                  <span
-                    key={m.codeMatiere}
-                    className={
-                      "matiere-pastille" +
-                      (m.nePlusUtiliser ? " matiere-pastille-desactivee" : "")
-                    }
-                    title={m.nePlusUtiliser ? "Matière ne plus utiliser" : undefined}
-                  >
-                    {m.abregeMatiere}
-                  </span>
-                ))
-              ) : (
-                <span className="formation-info-valeur">Aucune matière</span>
-              )}
-            </div>
+        {groupesSelectionnesObjets.length > 0 && (
+          <div className="groupes-selectionnes">
+            {groupesSelectionnesObjets.length > 1 && (
+              <button
+                type="button"
+                className="lien-bouton"
+                onClick={() => setGroupesSelectionnes([])}
+              >
+                Tout retirer ({groupesSelectionnesObjets.length} groupes)
+              </button>
+            )}
+            {groupesSelectionnesObjets.map((g) => {
+              const code = g.codeGroupe.toString();
+              const info = formationsInfo[g.codeFormation];
+              return (
+                <div className="groupe-carte" key={code}>
+                  <div className="groupe-carte-entete">
+                    <span>{libelleGroupe(g)}</span>
+                    <button
+                      type="button"
+                      className="groupe-carte-retirer"
+                      onClick={() => retirerGroupe(code)}
+                      aria-label={`Retirer le groupe ${libelleGroupe(g)}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="formation-info">
+                    <p>
+                      <span className="formation-info-label">Diplôme</span>
+                      <span className="formation-info-valeur">
+                        {!info || info.statut === "chargement"
+                          ? "Chargement…"
+                          : info.statut === "erreur"
+                          ? "Indisponible"
+                          : info.abregeFormation || "Non renseigné"}
+                      </span>
+                    </p>
+                    <p className="formation-info-label formation-info-sous-titre">
+                      Plan de formation du groupe
+                    </p>
+                    <div className="matieres-liste">
+                      {matieresTriees(g).length > 0 ? (
+                        matieresTriees(g).map((m) => (
+                          <span
+                            key={m.codeMatiere}
+                            className={
+                              "matiere-pastille" +
+                              (m.nePlusUtiliser ? " matiere-pastille-desactivee" : "")
+                            }
+                            title={m.nePlusUtiliser ? "Matière ne plus utiliser" : undefined}
+                          >
+                            {m.abregeMatiere}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="formation-info-valeur">Aucune matière</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="champ">
+                    <label>Nom exact de la formation dans Gescicca</label>
+                    <input
+                      type="text"
+                      value={nomsFormation[code] || ""}
+                      onChange={(e) =>
+                        setNomsFormation((prev) => ({ ...prev, [code]: e.target.value }))
+                      }
+                      className="export-input"
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
@@ -704,16 +832,6 @@ export default function ExportApprenants() {
                 <option key={a}>{a}</option>
               ))}
             </select>
-          </div>
-
-          <div className="champ">
-            <label>Nom exact de la formation dans Gescicca</label>
-            <input
-              type="text"
-              value={nomFormation}
-              onChange={(e) => setNomFormation(e.target.value)}
-              className="export-input"
-            />
           </div>
 
           <div className="champ">
@@ -749,16 +867,37 @@ export default function ExportApprenants() {
       <div className="barre-actions">
         <button
           onClick={handleExtract}
-          disabled={loading || !selectedGroupe || !referencesChargees || !groupesCharges}
+          disabled={
+            loading ||
+            groupesSelectionnes.length === 0 ||
+            !referencesChargees ||
+            !groupesCharges
+          }
           className="export-button"
         >
           {loading
             ? "Extraction en cours..."
             : referencesChargees && groupesCharges
-            ? "Extraire"
+            ? groupesSelectionnes.length > 1
+              ? `Extraire ${groupesSelectionnes.length} groupes`
+              : "Extraire"
             : "Chargement des référentiels..."}
         </button>
       </div>
+
+      {groupesEnEchec.length > 0 && (
+        <div className="export-alerte" role="alert">
+          <strong>
+            Extraction impossible pour {groupesEnEchec.length} groupe(s) :
+          </strong>
+          <ul>
+            {groupesEnEchec.map((nom) => (
+              <li key={nom}>{nom}</li>
+            ))}
+          </ul>
+          {csvPreview.length > 1 && <p>Les autres groupes sont affichés ci-dessous.</p>}
+        </div>
+      )}
 
       {csvPreview.length > 1 && (
         <section className="export-card apercu-card">
@@ -786,7 +925,14 @@ export default function ExportApprenants() {
             {csvPreview.slice(1).map((row, i) => (
               <tr
                 key={i}
-                className={lignesSelectionnees.has(i) ? "ligne-selectionnee" : undefined}
+                className={
+                  [
+                    lignesSelectionnees.has(i) ? "ligne-selectionnee" : "",
+                    debutsGroupe.has(i) ? "debut-groupe" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined
+                }
               >
                 <td className="col-selection">
                   <input
