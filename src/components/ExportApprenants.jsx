@@ -993,40 +993,38 @@ export default function ExportApprenants() {
         </section>
       )}
 
-      <div className="barre-actions barre-actions-fin">
-        {csvPreview.length > 1 && lignesSelectionnees.size === 0 && (
-          <p className="export-erreur">
-            Sélectionnez au moins une ligne à exporter.
-          </p>
-        )}
-        {selectionContientErreur && (
-          <p className="export-erreur">
-            Une ligne sélectionnée contient des cellules à corriger (en rouge).
-          </p>
-        )}
-        <div className="barre-actions-boutons">
-          <button
-            onClick={handleExportErreurs}
-            disabled={nbLignesFautives === 0 || exportErreursEnCours}
-            className="export-button export-button-secondaire"
-          >
-            {exportErreursEnCours
-              ? "Génération..."
-              : "Export Excel des erreurs"}
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={
-              csvPreview.length <= 1 ||
-              lignesSelectionnees.size === 0 ||
-              selectionContientErreur
-            }
-            className="export-button"
-          >
-            {loading ? "Export en cours..." : "Exporter en CSV"}
-          </button>
+      {csvPreview.length > 1 && (
+        <div className="barre-actions barre-actions-fin">
+          {lignesSelectionnees.size === 0 && (
+            <p className="export-erreur">
+              Sélectionnez au moins une ligne à exporter.
+            </p>
+          )}
+          {selectionContientErreur && (
+            <p className="export-erreur">
+              Une ligne sélectionnée contient des cellules à corriger (en rouge).
+            </p>
+          )}
+          <div className="barre-actions-boutons">
+            <button
+              onClick={handleExportErreurs}
+              disabled={nbLignesFautives === 0 || exportErreursEnCours}
+              className="export-button export-button-secondaire"
+            >
+              {exportErreursEnCours
+                ? "Génération..."
+                : "Export Excel des erreurs"}
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={lignesSelectionnees.size === 0 || selectionContientErreur}
+              className="export-button"
+            >
+              {loading ? "Export en cours..." : "Exporter en CSV"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
