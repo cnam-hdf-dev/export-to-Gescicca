@@ -169,6 +169,29 @@
   background-color: #0056b3;
 }
 
+.barre-actions-boutons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.export-button-secondaire {
+  background-color: #fff;
+  color: #007bff;
+  border: 1px solid #007bff;
+}
+
+.export-button-secondaire:disabled {
+  background-color: #fff;
+  color: #999;
+  border-color: #ccc;
+}
+
+.export-button-secondaire:hover:enabled {
+  background-color: #eef6ff;
+}
+
 .apercu-card {
   padding: 0;
   overflow-x: auto;

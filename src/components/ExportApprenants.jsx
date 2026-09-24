@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import "./ExportApprenants.css";
 import Papa from "papaparse";
 import { validerLigne } from "../gesciccaValidation";
+import { genererClasseurErreurs } from "../exportErreursExcel";
 import {
   DEFAUTS_INSCRIPTION,
   ANNEES,
@@ -119,6 +120,7 @@ export default function ExportApprenants() {
   const [csvPreview, setCsvPreview] = useState([]);
   const [nomGroupeExport, setNomGroupeExport] = useState("");
   const [editingCell, setEditingCell] = useState(null);
+  const [exportErreursEnCours, setExportErreursEnCours] = useState(false);
   // Indices (0-based dans csvPreview.slice(1)) des lignes cochées pour l'export.
   const [lignesSelectionnees, setLignesSelectionnees] = useState(() => new Set());
 
@@ -311,6 +313,7 @@ export default function ExportApprenants() {
   const selectionPartielle =
     lignesSelectionnees.size > 0 && !toutSelectionne;
   const selectionContientErreur = [...lignesSelectionnees].some(ligneEstFautive);
+  const nbLignesFautives = erreursParLigne.filter((_, i) => ligneEstFautive(i)).length;
 
   const basculerLigne = (i) => {
     if (ligneEstFautive(i)) return;
@@ -539,6 +542,37 @@ export default function ExportApprenants() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Exporte toutes les lignes fautives (indépendamment de la sélection) en
+  // .xlsx, cellules en erreur colorées + colonne « Erreurs ».
+  const handleExportErreurs = async () => {
+    setExportErreursEnCours(true);
+    try {
+      const buffer = await genererClasseurErreurs(
+        csvPreview[0],
+        csvPreview.slice(1),
+        erreursParLigne
+      );
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `erreurs_Gescicca_groupe_${sanitizeNomFichier(nomGroupeExport)}.xlsx`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Erreur export Excel des erreurs :", err);
+    } finally {
+      setExportErreursEnCours(false);
+    }
   };
 
   return (
@@ -824,17 +858,28 @@ export default function ExportApprenants() {
             Une ligne sélectionnée contient des cellules à corriger (en rouge).
           </p>
         )}
-        <button
-          onClick={handleExport}
-          disabled={
-            csvPreview.length <= 1 ||
-            lignesSelectionnees.size === 0 ||
-            selectionContientErreur
-          }
-          className="export-button"
-        >
-          {loading ? "Export en cours..." : "Exporter en CSV"}
-        </button>
+        <div className="barre-actions-boutons">
+          <button
+            onClick={handleExportErreurs}
+            disabled={nbLignesFautives === 0 || exportErreursEnCours}
+            className="export-button export-button-secondaire"
+          >
+            {exportErreursEnCours
+              ? "Génération..."
+              : "Export Excel des erreurs"}
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={
+              csvPreview.length <= 1 ||
+              lignesSelectionnees.size === 0 ||
+              selectionContientErreur
+            }
+            className="export-button"
+          >
+            {loading ? "Export en cours..." : "Exporter en CSV"}
+          </button>
+        </div>
       </div>
     </div>
   );
