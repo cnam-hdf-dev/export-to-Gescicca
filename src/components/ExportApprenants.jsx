@@ -77,6 +77,74 @@ const sansAccents = (val) =>
 const libelleGroupe = (g) =>
   g.nomGroupe || g.abregeGroupe || `Groupe ${g.codeGroupe}`;
 
+// Copie un texte dans le presse-papiers (repli pour les contextes non sécurisés
+// où navigator.clipboard est indisponible, ex. http hors localhost).
+const copierDansPressePapiers = async (texte) => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(texte);
+    return;
+  }
+  const zone = document.createElement("textarea");
+  zone.value = texte;
+  zone.style.position = "fixed";
+  zone.style.opacity = "0";
+  document.body.appendChild(zone);
+  zone.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(zone);
+  if (!ok) throw new Error("Copie impossible");
+};
+
+// Petite icône de copie ; affiche une coche pendant 1,5 s après la copie.
+function BoutonCopier({ texte, libelle }) {
+  const [copie, setCopie] = useState(false);
+  const minuterieRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(minuterieRef.current), []);
+
+  const copier = async () => {
+    try {
+      await copierDansPressePapiers(texte);
+      setCopie(true);
+      clearTimeout(minuterieRef.current);
+      minuterieRef.current = setTimeout(() => setCopie(false), 1500);
+    } catch (err) {
+      console.error("Erreur lors de la copie :", err);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className={"bouton-copier" + (copie ? " bouton-copier-ok" : "")}
+      onClick={copier}
+      aria-label={copie ? "Copié" : libelle}
+      title={copie ? "Copié" : libelle}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {copie ? (
+          <polyline points="20 6 9 17 4 12" />
+        ) : (
+          <>
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
+}
+
 // Plan de formation d'un groupe (matières triées par abrégé pour l'affichage).
 const matieresTriees = (g) =>
   [...(g.matieres || [])].sort((a, b) =>
@@ -760,7 +828,13 @@ export default function ExportApprenants() {
               return (
                 <div className="groupe-carte" key={code}>
                   <div className="groupe-carte-entete">
-                    <span>{libelleGroupe(g)}</span>
+                    <span className="groupe-carte-nom">
+                      {libelleGroupe(g)}
+                      <BoutonCopier
+                        texte={libelleGroupe(g)}
+                        libelle="Copier le nom du groupe"
+                      />
+                    </span>
                     <button
                       type="button"
                       className="groupe-carte-retirer"
@@ -781,6 +855,12 @@ export default function ExportApprenants() {
                           ? "Indisponible"
                           : info.abregeFormation || "Non renseigné"}
                       </span>
+                      {info?.statut === "ok" && info.abregeFormation && (
+                        <BoutonCopier
+                          texte={info.abregeFormation}
+                          libelle="Copier le code diplôme"
+                        />
+                      )}
                     </p>
                     <p className="formation-info-label formation-info-sous-titre">
                       Plan de formation du groupe

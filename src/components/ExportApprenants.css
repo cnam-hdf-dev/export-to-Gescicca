@@ -163,6 +163,38 @@
   font-weight: 600;
 }
 
+.groupe-carte-nom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bouton-copier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: #888;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.bouton-copier:hover {
+  background-color: #e8e8e8;
+  color: #333;
+}
+
+.bouton-copier-ok,
+.bouton-copier-ok:hover {
+  color: #2e7d32;
+}
+
 .groupe-carte-retirer {
   padding: 0 6px;
   border: none;
