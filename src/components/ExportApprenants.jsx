@@ -130,6 +130,8 @@ export default function ExportApprenants() {
   const [libelleExport, setLibelleExport] = useState("");
   // Groupes dont l'extraction a échoué (libellés), signalés sous le bouton Extraire.
   const [groupesEnEchec, setGroupesEnEchec] = useState([]);
+  // Vrai quand l'extraction a abouti mais sans aucun apprenant à afficher.
+  const [aucunApprenant, setAucunApprenant] = useState(false);
   // Indices (dans csvPreview.slice(1)) des lignes qui ouvrent un nouveau groupe.
   const [debutsGroupe, setDebutsGroupe] = useState(() => new Set());
   const [editingCell, setEditingCell] = useState(null);
@@ -211,6 +213,7 @@ export default function ExportApprenants() {
     setGroupeOuvert(false);
     setCsvPreview([]);
     setGroupesEnEchec([]);
+    setAucunApprenant(false);
     setLignesSelectionnees(new Set());
   };
 
@@ -358,6 +361,7 @@ export default function ExportApprenants() {
     if (groupesSelectionnesObjets.length === 0) return;
     setLoading(true);
     setGroupesEnEchec([]);
+    setAucunApprenant(false);
     try {
       // Un appel par groupe, en parallèle ; l'échec d'un groupe n'empêche pas
       // l'affichage des autres.
@@ -572,6 +576,7 @@ export default function ExportApprenants() {
       setCsvPreview(csvRows);
       setDebutsGroupe(debuts);
       setGroupesEnEchec(echecs);
+      setAucunApprenant(csvRows.length === 1 && groupesReussis.length > 0);
       setLibelleExport(
         groupesReussis.length === 1
           ? `groupe_${sanitizeNomFichier(groupesReussis[0].nomGroupe || groupesReussis[0].codeGroupe)}`
@@ -897,6 +902,10 @@ export default function ExportApprenants() {
           </ul>
           {csvPreview.length > 1 && <p>Les autres groupes sont affichés ci-dessous.</p>}
         </div>
+      )}
+
+      {aucunApprenant && (
+        <p className="export-info">Aucun apprenant dans le ou les groupes sélectionnés.</p>
       )}
 
       {csvPreview.length > 1 && (
