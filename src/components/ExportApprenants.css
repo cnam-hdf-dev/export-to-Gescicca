@@ -169,7 +169,7 @@
   gap: 4px;
 }
 
-.bouton-copier {
+.bouton-icone {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -185,14 +185,23 @@
   vertical-align: middle;
 }
 
-.bouton-copier:hover {
+.bouton-icone:hover {
   background-color: #e8e8e8;
   color: #333;
 }
 
-.bouton-copier-ok,
-.bouton-copier-ok:hover {
+.bouton-icone-ok,
+.bouton-icone-ok:hover {
   color: #2e7d32;
+}
+
+.groupe-carte-nom-input {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid #007bff;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .groupe-carte-retirer {

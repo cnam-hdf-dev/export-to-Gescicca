@@ -116,7 +116,7 @@ function BoutonCopier({ texte, libelle }) {
   return (
     <button
       type="button"
-      className={"bouton-copier" + (copie ? " bouton-copier-ok" : "")}
+      className={"bouton-icone" + (copie ? " bouton-icone-ok" : "")}
       onClick={copier}
       aria-label={copie ? "Copié" : libelle}
       title={copie ? "Copié" : libelle}
@@ -189,6 +189,12 @@ export default function ExportApprenants() {
   const [groupesSelectionnes, setGroupesSelectionnes] = useState([]);
   // Nom exact de la formation dans Gescicca, par code de groupe.
   const [nomsFormation, setNomsFormation] = useState({});
+  // Nom de groupe renommé pour cette extraction (n'altère pas Yparéo), par
+  // code de groupe ; absent du dictionnaire = nom Yparéo inchangé.
+  const [nomsGroupePersonnalises, setNomsGroupePersonnalises] = useState({});
+  // Code du groupe dont le nom est en cours d'édition (null si aucun).
+  const [groupeEnEdition, setGroupeEnEdition] = useState(null);
+  const [valeurEdition, setValeurEdition] = useState("");
   const [annee, setAnnee] = useState(ANNEE_DEFAUT);
   const [nomCentreEnseignement, setNomCentreEnseignement] = useState(CENTRE_ENSEIGNEMENT_DEFAUT);
   const [nomCentreAttachement, setNomCentreAttachement] = useState("");
@@ -349,7 +355,32 @@ export default function ExportApprenants() {
 
   const retirerGroupe = (code) => {
     setGroupesSelectionnes((prev) => prev.filter((c) => c !== code));
+    setGroupeEnEdition((prev) => (prev === code ? null : prev));
   };
+
+  // Nom affiché/utilisé pour un groupe : renommage local s'il existe, sinon
+  // nom Yparéo (libelleGroupe).
+  const nomGroupeAffiche = (g) =>
+    nomsGroupePersonnalises[g.codeGroupe.toString()] || libelleGroupe(g);
+
+  const commencerRenommage = (g) => {
+    setGroupeEnEdition(g.codeGroupe.toString());
+    setValeurEdition(nomGroupeAffiche(g));
+  };
+
+  const validerRenommage = () => {
+    const code = groupeEnEdition;
+    const valeur = valeurEdition.trim();
+    setNomsGroupePersonnalises((prev) => {
+      const suivant = { ...prev };
+      if (valeur) suivant[code] = valeur;
+      else delete suivant[code];
+      return suivant;
+    });
+    setGroupeEnEdition(null);
+  };
+
+  const annulerRenommage = () => setGroupeEnEdition(null);
 
   // Ajoute (ou retire, si tous déjà cochés) l'ensemble des résultats filtrés.
   const basculerTousFiltres = () => {
@@ -450,12 +481,12 @@ export default function ExportApprenants() {
       resultats.forEach((resultat, k) => {
         const g = groupesSelectionnesObjets[k];
         if (resultat.status === "rejected") {
-          console.error(`Erreur extraction du groupe ${libelleGroupe(g)} :`, resultat.reason);
-          echecs.push(libelleGroupe(g));
+          console.error(`Erreur extraction du groupe ${nomGroupeAffiche(g)} :`, resultat.reason);
+          echecs.push(nomGroupeAffiche(g));
           return;
         }
         groupesReussis.push(g);
-        const nomGroupe = g.nomGroupe || "";
+        const nomGroupe = nomGroupeAffiche(g);
         const nomFormation = nomsFormation[g.codeGroupe.toString()] || "";
         resultat.value.forEach((d) =>
           lignesSource.push({ d, nomGroupe, nomFormation, codeGroupe: g.codeGroupe })
@@ -647,7 +678,7 @@ export default function ExportApprenants() {
       setAucunApprenant(csvRows.length === 1 && groupesReussis.length > 0);
       setLibelleExport(
         groupesReussis.length === 1
-          ? `groupe_${sanitizeNomFichier(groupesReussis[0].nomGroupe || groupesReussis[0].codeGroupe)}`
+          ? `groupe_${sanitizeNomFichier(nomGroupeAffiche(groupesReussis[0]))}`
           : `${groupesReussis.length}_groupes`
       );
       setLignesSelectionnees(new Set());
@@ -828,18 +859,111 @@ export default function ExportApprenants() {
               return (
                 <div className="groupe-carte" key={code}>
                   <div className="groupe-carte-entete">
-                    <span className="groupe-carte-nom">
-                      {libelleGroupe(g)}
-                      <BoutonCopier
-                        texte={libelleGroupe(g)}
-                        libelle="Copier le nom du groupe"
-                      />
-                    </span>
+                    {groupeEnEdition === code ? (
+                      <span className="groupe-carte-nom">
+                        <input
+                          type="text"
+                          className="groupe-carte-nom-input"
+                          value={valeurEdition}
+                          autoFocus
+                          onChange={(e) => setValeurEdition(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              validerRenommage();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              annulerRenommage();
+                            }
+                          }}
+                          onBlur={annulerRenommage}
+                        />
+                        <button
+                          type="button"
+                          className="bouton-icone bouton-icone-ok"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            validerRenommage();
+                          }}
+                          aria-label="Valider le renommage"
+                          title="Valider (Entrée)"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="bouton-icone"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            annulerRenommage();
+                          }}
+                          aria-label="Annuler le renommage"
+                          title="Annuler (Échap)"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="groupe-carte-nom">
+                        {nomGroupeAffiche(g)}
+                        <BoutonCopier
+                          texte={nomGroupeAffiche(g)}
+                          libelle="Copier le nom du groupe"
+                        />
+                        <button
+                          type="button"
+                          className="bouton-icone"
+                          onClick={() => commencerRenommage(g)}
+                          aria-label="Renommer le groupe"
+                          title="Renommer le groupe (n'affecte pas Yparéo)"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                          </svg>
+                        </button>
+                      </span>
+                    )}
                     <button
                       type="button"
                       className="groupe-carte-retirer"
                       onClick={() => retirerGroupe(code)}
-                      aria-label={`Retirer le groupe ${libelleGroupe(g)}`}
+                      aria-label={`Retirer le groupe ${nomGroupeAffiche(g)}`}
                     >
                       ×
                     </button>
