@@ -339,6 +339,22 @@ export default function ExportApprenants() {
     });
   }, [groupesSelectionnes, groupes]);
 
+  // Un groupe retiré de la sélection (croix, décoche, « tout retirer »,
+  // changement de période) perd son renommage local : il repart du nom
+  // Yparéo s'il est resélectionné plus tard.
+  useEffect(() => {
+    setNomsGroupePersonnalises((prev) => {
+      const codesActifs = new Set(groupesSelectionnes);
+      const suivant = {};
+      let modifie = false;
+      Object.entries(prev).forEach(([code, valeur]) => {
+        if (codesActifs.has(code)) suivant[code] = valeur;
+        else modifie = true;
+      });
+      return modifie ? suivant : prev;
+    });
+  }, [groupesSelectionnes]);
+
   const groupesFiltres = groupes.filter((g) =>
     sansAccents(libelleGroupe(g)).includes(sansAccents(rechercheGroupe))
   );
