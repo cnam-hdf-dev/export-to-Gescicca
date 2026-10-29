@@ -20,7 +20,7 @@ npm run build      # build de production dans build/
 npm test           # runner de tests CRA (watch). Test ciblé : npm test -- gesciccaValidation
 ```
 
-> `src/gesciccaValidation.test.js` couvre la fonction pure de validation.
+> `src/gesciccaValidation.test.js`, `src/exportErreursExcel.test.js` et `src/regleNationalite.test.js` couvrent les fonctions pures.
 > `src/App.test.js` est encore le test généré par CRA et **échoue** (il cherche un lien « learn react » absent). À remplacer ou supprimer.
 
 ## Configuration
@@ -76,6 +76,7 @@ Les valeurs métier externalisées sont dans **`src/config/gesciccaDefaults.js`*
 Règles de transformation notables :
 
 - **Nom / nom d'usage** : `NOM` = `nomJeuneFille` si présent, sinon `nomApprenant`. `NOM_USAGE` = `nomApprenant` seulement si `nomJeuneFille` existe **et** diffère.
+- **Nationalité déduite** (`appliquerRegleNationalite`, `src/regleNationalite.js`, testée dans `regleNationalite.test.js`) : appliquée à l'extraction, sur les codes Gescicca déjà convertis. Si `PAYS_NAISSANCE` et `CODE_NATIONALITE` sont tous deux ≠ `"0"` (France) et que `CODE_NATIONALITE` vaut `990` ou est vide, il est remplacé par `PAYS_NAISSANCE`. Pas de recopie si `PAYS_NAISSANCE` est vide, `990` ou `995` (la validation signale alors la cellule). `995` en nationalité n'est pas touché. La cellule déduite est repérée en **vert discret** (`cellulesDeduites`, clés `ligne:colonne`, classe `cellule-deduite` ; le rouge d'une erreur reste prioritaire) et perd son repère dès qu'on l'édite à la main ; une modification manuelle n'est jamais retraitée.
 - **Lieu de naissance** : code INSEE via la table `communes` de `referencesRef`, sinon libellé `lieuNaissance`.
 - **Codes postaux et INSEE** : `formatCodePostal` = `String(val).padStart(5, "0")` (mal nommé : sert aussi au code INSEE).
 
