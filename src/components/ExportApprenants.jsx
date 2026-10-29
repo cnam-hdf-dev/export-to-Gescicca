@@ -3,6 +3,7 @@ import "./ExportApprenants.css";
 import Papa from "papaparse";
 import { validerLigne } from "../gesciccaValidation";
 import { genererClasseurErreurs } from "../exportErreursExcel";
+import { appliquerRegleNationalite } from "../regleNationalite";
 import {
   DEFAUTS_INSCRIPTION,
   ANNEES,
@@ -208,6 +209,10 @@ export default function ExportApprenants() {
   const [aucunApprenant, setAucunApprenant] = useState(false);
   // Indices (dans csvPreview.slice(1)) des lignes qui ouvrent un nouveau groupe.
   const [debutsGroupe, setDebutsGroupe] = useState(() => new Set());
+  // Cellules dont la valeur a été déduite à l'extraction (clés « ligne:colonne »,
+  // ligne = indice dans csvPreview.slice(1)) ; repère vert tant qu'elles ne sont
+  // pas modifiées à la main.
+  const [cellulesDeduites, setCellulesDeduites] = useState(() => new Set());
   const [editingCell, setEditingCell] = useState(null);
   const [exportErreursEnCours, setExportErreursEnCours] = useState(false);
   // Indices (0-based dans csvPreview.slice(1)) des lignes cochées pour l'export.
@@ -286,6 +291,7 @@ export default function ExportApprenants() {
     setRechercheGroupe("");
     setGroupeOuvert(false);
     setCsvPreview([]);
+    setCellulesDeduites(new Set());
     setGroupesEnEchec([]);
     setAucunApprenant(false);
     setLignesSelectionnees(new Set());
@@ -595,6 +601,8 @@ export default function ExportApprenants() {
       // );
 
       const { communes, nationalites, pays } = referencesRef.current;
+      const colNationalite = csvRows[0].indexOf("CODE_NATIONALITE");
+      const deduites = new Set();
 
       lignesSource.forEach(({ d, nomGroupe, nomFormation, codeGroupe }) => {
         const codeInscriptionEnCours = d.informationsCourantes?.codeInscription;
@@ -609,11 +617,20 @@ export default function ExportApprenants() {
         const codeInseeNaissance = formatCodePostal(communes[d.codeCommuneNaissance]);
         const codePostal = formatCodePostal(d.adresse?.cp);
 
+        const paysNaissance = pays[d.codePaysNaissance] || '';
+        const { codeNationalite, deduite } = appliquerRegleNationalite(
+          paysNaissance,
+          nationalites[d.codeNationalite] || ""
+        );
+        // csvRows contient déjà l'en-tête : l'indice de la future ligne dans
+        // csvPreview.slice(1) est csvRows.length - 1.
+        if (deduite) deduites.add(`${csvRows.length - 1}:${colNationalite}`);
+
         csvRows.push([
           d.codeCivilite, // TITRE
           // '',// INDEMNISATION
           // '',// EXPERIENCE
-          nationalites[d.codeNationalite] || "", // CODE_NATIONALITE
+          codeNationalite, // CODE_NATIONALITE
           // '',// SITUATION_FAMILIALE
           // '',// PROFESSION_INSEE
           // '',// ANCIEN_CODE_AUDITEUR
@@ -624,7 +641,7 @@ export default function ExportApprenants() {
           d.prenomApprenant, // PRENOM
           (d.nomJeuneFille !== null && d.nomJeuneFille !== '') && d.nomJeuneFille !== d.nomApprenant ? d.nomApprenant : '' || '',// NOM_USAGE
           d.dateNaissance, // DATE_NAISSANCE
-          pays[d.codePaysNaissance] || '', // PAYS_NAISSANCE
+          paysNaissance, // PAYS_NAISSANCE
           codeInseeNaissance !== '' ? codeInseeNaissance : d.lieuNaissance, // LIEU_NAISSANCE
           d.adresse?.adr1, // ADRESSE_1
           d.adresse?.adr2 || '', // ADRESSE_2
@@ -690,6 +707,7 @@ export default function ExportApprenants() {
 
       setCsvPreview(csvRows);
       setDebutsGroupe(debuts);
+      setCellulesDeduites(deduites);
       setGroupesEnEchec(echecs);
       setAucunApprenant(csvRows.length === 1 && groupesReussis.length > 0);
       setLibelleExport(
@@ -1179,11 +1197,19 @@ export default function ExportApprenants() {
                 </td>
                 {row.map((cell, j) => {
                 const erreur = erreursParLigne[i]?.[csvPreview[0][j]];
+                const deduite = cellulesDeduites.has(`${i}:${j}`);
                 return (
                 <td
                   key={j}
-                  className={erreur ? "cellule-fautive" : undefined}
-                  title={erreur || undefined}
+                  className={
+                    erreur ? "cellule-fautive" : deduite ? "cellule-deduite" : undefined
+                  }
+                  title={
+                    erreur ||
+                    (deduite
+                      ? "Nationalité déduite du pays de naissance (990 ou absente dans Yparéo)"
+                      : undefined)
+                  }
                   onDoubleClick={() => setEditingCell({ row: i, col: j })}
                 >
                   {editingCell && editingCell.row === i && editingCell.col === j ? (
@@ -1197,6 +1223,13 @@ export default function ExportApprenants() {
                         next[i + 1] = [...next[i + 1]];
                         next[i + 1][j] = e.target.value;
                         setCsvPreview(next);
+                        if (cellulesDeduites.has(`${i}:${j}`)) {
+                          setCellulesDeduites((prev) => {
+                            const suivant = new Set(prev);
+                            suivant.delete(`${i}:${j}`);
+                            return suivant;
+                          });
+                        }
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === "Escape") {

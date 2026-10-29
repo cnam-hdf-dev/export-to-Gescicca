@@ -399,6 +399,10 @@
   background-color: #fde2e2;
 }
 
+.preview-table td.cellule-deduite {
+  background-color: #e6f4ea;
+}
+
 .preview-table .col-selection {
   width: 1%;
   text-align: center;
